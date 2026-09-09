@@ -11,41 +11,43 @@ A Kubernetes cluster is divided into two primary planes: the Control Plane (the 
 |                                                                                   |
 |    +-------------------------------------------------------------------------+    |
 |    |                             kube-apiserver                              |    |
-|    |  - Central gateway (Authenticates, Validates, Admits)                   |    |
+|    |  - Central gateway (Authenticates, Validates, Admits)         |    |
 |    +---------------------+-------------------+---------------------+---------+    |
 |                          |                   ^                     ^              |
 |           2. Read/Write  |      3. Watch &   |        5. Watch &   |              |
-|              State     v      Reconcile   |           Bind Node |              |
+|              State[cite: 1]    v      Reconcile   |           Bind Node |              |
 |    +---------------------+---+   +-----------+-----+   +-----------+-----+        |
 |    |          etcd           |   | kube-controller-|   | kube-scheduler  |        |
 |    | - Consistent key-value  |   |     manager     |   | - Scores node   |        |
-|    |   source of truth |   | - Deployment    |   |   resources     |        |
-|    | - Stores all cluster    |   |   Controller    |   | - Assigns Pods  |        |
-|    |   data (Pods, Configs)  |   | - EndpointSlice |   |   to Nodes     |        |
-|    +-------------------------+   |   Controller  |   +-----------------+        |
-|                                  +-----------------+                              |
+|    |   source of truth[cite: 1] |   | - Deployment    |   |   resources     |        |
+|    | - Stores all object data|   |   Controller    |   | - Assigns Pods  |        |
+|    |   (Pods, Services,      |   | - EndpointSlice |   |   to Nodes[cite: 1]  |        |
+|    |    ConfigMaps, Secrets) |   |   Controller    |   +-----------------+        |
+|    +-------------------------+   +-----------------+                              |
+|                                                                                   |
 +=========================================+=========================================+
                                           |
-                                          | 6. Watch assigned Pods & Services
+                                          | 6. Watch assigned Pods & Services[cite: 1]
                                           v
 +=================================== WORKER NODE ===================================+
-|  (In Minikube, Control Plane & Worker reside on the same single node instance)    |
+|  (In Minikube, Control Plane & Worker reside on the same single-node machine)    |
 |                                                                                   |
 |   [ NETWORKING LAYER ]                         [ WORKLOAD RUNTIME LAYER ]         |
 |   +--------------------------+                 +-------------------------------+  |
 |   |        kube-proxy        |                 |            kubelet            |  |
-|   | - Watches Service &      |                 | - Agent on node               |  |
+|   | - Watches Service &      |                 | - Agent on node[cite: 1]     |  |
 |   |   EndpointSlice changes  |                 | - Mounts ConfigMaps & Secrets |  |
-|   | - Programs iptables/IPVS |                 | - Health checks containers    |  |
+|   | - Programs iptables/IPVS |                 | - Health checks (Liveness)    |  |
 |   +------------+-------------+                 +---------------+---------------+  |
 |                |                                               |                  |
 |                | Writes routing rules                          | 7. CRI Interface |
 |                v                                               v    (containerd)  |
 |   +--------------------------+                 +-------------------------------+  |
 |   |       Linux Kernel       |                 |     Container Runtime         |  |
-|   |      (iptables/IPVS)     |                 | - Pulls images (nginx:alpine)|  |
+|   |      (iptables/IPVS)     |                 | - Pulls images (nginx:alpine) |  |
 |   +------------+-------------+                 | - Injects ENV variables       |  |
 |                |                               +---------------+---------------+  |
+|                |                                               |                  |
 |                | Proxies traffic                               | Launches         |
 |                +-----------------------+-----------------------+                  |
 |                                        |                                          |
@@ -74,3 +76,15 @@ kubelet: The node-level agent that communicates directly with kube-apiserver[cit
 Container Runtime (e.g., containerd): Low-level engine responsible for pulling images, allocating cgroups and network namespaces, and running containers[cite: 2].
 
 kube-proxy: The network proxy running on each node that maintains network rules (iptables or IPVS) to distribute traffic destined for Service virtual IPs across healthy Pod backends.
+
+Summary of Covered Modules:
+
+Control Plane Internals: How kube-apiserver, etcd, kube-scheduler, and kube-controller-manager coordinate state declarations and self-healing reconciliation loops[cite: 1].
+
+Workloads & Controllers: Transitioning from ephemeral naked Pods to declarative, self-healing Deployments and ReplicaSets.
+
+Configuration Management: Injecting decoupled environment variables and credentials using ConfigMaps and Secrets, and diagnosing startup bottlenecks (CreateContainerConfigError).
+
+Service Networking & Discovery: How ClusterIP Services use label selectors to abstract dynamic Pod IPs, how the controller creates Endpoints / EndpointSlices, and how kube-proxy programs kernel packet forwarding.
+
+

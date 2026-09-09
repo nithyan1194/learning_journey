@@ -4,3 +4,12 @@
 | container not found ("nginx")     | Running kubectl exec against a Pod that is terminating, restarting, or failed during container creation. | Target only healthy pods using field selectors: kubectl get pods --field-selector=status.phase=Running.                                                                                                                           |
 | Endpoints is deprecated in v1.33+ | Monolithic v1.Endpoints objects do not scale efficiently in large clusters.                              | Inspect modern endpoint slices chunked by the EndpointSlice Controller: kubectl get endpointslice[cite: 2].                                                                                                                       |
 | Protection Rules                  | Cannot pause itself for manual review natively without custom script polling.                            | Natively enforces Required Reviewers (Manual Gates), deployment wait timers, and branch restrictions.                                                                                                                             |
+
+
+
+
+Why Endpoints are Deprecated: The EndpointSlice Transition
+The Problem with v1.Endpoints: In the original design, all backend IP addresses for a Service were stored inside a single Endpoints resource. When large enterprise clusters scale to hundreds or thousands of Pods, modifying a single Pod forces the entire giant list to serialize and sync across every node via kube-proxy, creating significant network and CPU bottlenecks.
+
+The Solution (EndpointSlice): Kubernetes introduced EndpointSlice to break backend IPs into chunks (defaulting to up to 100 endpoints per slice). This allows granular updates without resyncing the entire cluster list.
+

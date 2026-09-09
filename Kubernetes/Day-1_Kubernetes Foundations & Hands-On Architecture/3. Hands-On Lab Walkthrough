@@ -19,7 +19,10 @@ kubectl get nodes
 
 
 3.2 Declarative Workload: Deployments & Self-Healing
-Naked Pods (kubectl run) lack self-healing. Production deployments rely on Deployments, which control underlying ReplicaSets to guarantee application availability.
+
+In production and technical interviews, you rarely create naked Pods (kubectl run) because if a Pod dies, it will not be replaced. Instead, you use a Deployment, which manages a ReplicaSet behind the scenes.
+
+Create a file named nginx-deployment.yaml:
 
 Save as nginx-deployment.yaml:
 
@@ -61,6 +64,15 @@ kubectl get replicasets
 kubectl get pods -l app=web-app
 
 
+Notice what happened under the hood:
+
+The Controller Manager Loop: kube-controller-manager noticed that the desired count (2 replicas) differed from the current count (0), so it spawned a ReplicaSet to request the two Pods.
+
+The Scheduler & Kubelet: kube-scheduler bound the Pods to minikube, and the local kubelet instructed the container runtime to pull the image and run both replicas.
+
+
+To observe why Deployments are used in production, simulate a crash by manually deleting one of the pods:
+
 Self-Healing Test:
 
 # Delete one Pod manually:
@@ -69,10 +81,12 @@ kubectl delete pod $(kubectl get pods -l app=web-app -o jsonpath="{.items[0].met
 # Immediately list pods:
 kubectl get pods -l app=web-app
 
-Observation: The Deployment Controller immediately detects that current replicas (1) do not match desired replicas (2), scheduling an immediate replacement[cite: 2].
+You will see the old pod terminating while the Deployment controller has already launched a brand-new pod with a new name to keep the replica count at 2.
+
 
 3.3 Decoupling Configuration: ConfigMaps & Secrets
-To satisfy 12-Factor app architecture, configuration must be decoupled from container images.
+Hardcoding application configuration or credentials directly into container images or manifests violates 12-Factor app architecture. 
+Production DevOps workflows use ConfigMaps (plain text) and Secrets (base64-encoded sensitive keys).
 
 Save as app-config.yaml:
 
@@ -143,6 +157,9 @@ kubectl exec $POD_NAME -- env | grep -E "APP_ENV|FEATURE_FLAG|DB_PASSWORD"
 
 
 3.4 Service Discovery, Endpoints, & EndpointSlices
+
+Pods have ephemeral, internal IP addresses that change whenever they restart. 
+To route traffic reliably across both replicas, create a Service:
 Because Pod IP addresses are ephemeral, a Service provides a durable DNS name and virtual IP (ClusterIP).
 
 Save as web-service.yaml:
