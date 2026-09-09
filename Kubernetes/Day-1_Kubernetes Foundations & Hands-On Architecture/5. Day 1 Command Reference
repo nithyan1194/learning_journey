@@ -1,0 +1,17 @@
+# Cluster lifecycle
+minikube start --driver=docker
+kubectl cluster-info
+kubectl get nodes
+
+# Workload deployment & inspection
+kubectl apply -f <filename>.yaml
+kubectl get deployments,replicasets,pods -o wide
+kubectl describe pod <pod-name>
+
+# Debugging & validation
+kubectl logs <pod-name>
+kubectl exec -it <pod-name> -- <command>
+kubectl get endpointslice
+
+# Networking testing
+kubectl port-forward service/<service-name> 8080:80

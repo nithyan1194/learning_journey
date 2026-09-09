@@ -1,0 +1,76 @@
+A Kubernetes cluster is divided into two primary planes: the Control Plane (the brain) and the Worker Nodes (the muscle).
+
++-----------------------------------------------------------------------------------+
+|                                       USER                                        |
+|         Commands: kubectl apply (Deployments, Services, ConfigMaps, Secrets)      |
++-----------------------------------------+-----------------------------------------+
+                                          |
+                                          | 1. HTTP REST Manifests
+                                          v
++================================== CONTROL PLANE ==================================+
+|                                                                                   |
+|    +-------------------------------------------------------------------------+    |
+|    |                             kube-apiserver                              |    |
+|    |  - Central gateway (Authenticates, Validates, Admits)                   |    |
+|    +---------------------+-------------------+---------------------+---------+    |
+|                          |                   ^                     ^              |
+|           2. Read/Write  |      3. Watch &   |        5. Watch &   |              |
+|              State     v      Reconcile   |           Bind Node |              |
+|    +---------------------+---+   +-----------+-----+   +-----------+-----+        |
+|    |          etcd           |   | kube-controller-|   | kube-scheduler  |        |
+|    | - Consistent key-value  |   |     manager     |   | - Scores node   |        |
+|    |   source of truth |   | - Deployment    |   |   resources     |        |
+|    | - Stores all cluster    |   |   Controller    |   | - Assigns Pods  |        |
+|    |   data (Pods, Configs)  |   | - EndpointSlice |   |   to Nodes     |        |
+|    +-------------------------+   |   Controller  |   +-----------------+        |
+|                                  +-----------------+                              |
++=========================================+=========================================+
+                                          |
+                                          | 6. Watch assigned Pods & Services
+                                          v
++=================================== WORKER NODE ===================================+
+|  (In Minikube, Control Plane & Worker reside on the same single node instance)    |
+|                                                                                   |
+|   [ NETWORKING LAYER ]                         [ WORKLOAD RUNTIME LAYER ]         |
+|   +--------------------------+                 +-------------------------------+  |
+|   |        kube-proxy        |                 |            kubelet            |  |
+|   | - Watches Service &      |                 | - Agent on node               |  |
+|   |   EndpointSlice changes  |                 | - Mounts ConfigMaps & Secrets |  |
+|   | - Programs iptables/IPVS |                 | - Health checks containers    |  |
+|   +------------+-------------+                 +---------------+---------------+  |
+|                |                                               |                  |
+|                | Writes routing rules                          | 7. CRI Interface |
+|                v                                               v    (containerd)  |
+|   +--------------------------+                 +-------------------------------+  |
+|   |       Linux Kernel       |                 |     Container Runtime         |  |
+|   |      (iptables/IPVS)     |                 | - Pulls images (nginx:alpine)|  |
+|   +------------+-------------+                 | - Injects ENV variables       |  |
+|                |                               +---------------+---------------+  |
+|                | Proxies traffic                               | Launches         |
+|                +-----------------------+-----------------------+                  |
+|                                        |                                          |
+|                                        v                                          |
+|                      +-----------------------------------+                        |
+|                      |             PODS / APP            |                        |
+|                      |  Label: app=web-app               |                        |
+|                      |  Endpoints: [10.244.0.5, .6]      |                        |
+|                      |  ENV: APP_ENV, DB_PASSWORD        |                        |
+|                      +-----------------------------------+                        |
+|                                                                                   |
++===================================================================================+
+
+Control Plane Components
+kube-apiserver: The single REST API entry point for the entire cluster. It handles authentication, authorization (RBAC), admission control, and is the only component that writes to etcd.
+
+etcd: A distributed, consistent key-value store acting as the single source of truth for the desired and actual cluster state[cite: 2].
+
+kube-scheduler: Continuously monitors for unassigned Pods and evaluates node conditions (capacity, taints, affinity) to select the optimal node[cite: 2].
+
+kube-controller-manager: Contains internal reconciliation loops (Deployment Controller, EndpointSlice Controller, Node Controller) that drive actual cluster state toward the desired state declared in manifests[cite: 2].
+
+Worker Node Components
+kubelet: The node-level agent that communicates directly with kube-apiserver[cite: 2]. It watches for Pods assigned to its node and issues Container Runtime Interface (CRI) instructions[cite: 2].
+
+Container Runtime (e.g., containerd): Low-level engine responsible for pulling images, allocating cgroups and network namespaces, and running containers[cite: 2].
+
+kube-proxy: The network proxy running on each node that maintains network rules (iptables or IPVS) to distribute traffic destined for Service virtual IPs across healthy Pod backends.

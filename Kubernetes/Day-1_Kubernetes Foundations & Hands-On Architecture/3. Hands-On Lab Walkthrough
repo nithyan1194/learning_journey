@@ -1,0 +1,182 @@
+3.1 Environment Setup (GitHub Codespaces)
+Because Codespaces provides a pre-configured Docker runtime, Minikube runs seamlessly using the Docker driver:
+
+# 1. Install kubectl CLI
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+rm kubectl
+
+# 2. Install Minikube
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+rm minikube-linux-amd64
+
+# 3. Start cluster with the Docker driver
+minikube start --driver=docker
+
+# 4. Verify node health
+kubectl get nodes
+
+
+3.2 Declarative Workload: Deployments & Self-Healing
+Naked Pods (kubectl run) lack self-healing. Production deployments rely on Deployments, which control underlying ReplicaSets to guarantee application availability.
+
+Save as nginx-deployment.yaml:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  labels:
+    tier: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "250m"
+            memory: "128Mi"
+
+Apply and verify:
+
+
+kubectl apply -f nginx-deployment.yaml
+kubectl get deployments
+kubectl get replicasets
+kubectl get pods -l app=web-app
+
+
+Self-Healing Test:
+
+# Delete one Pod manually:
+kubectl delete pod $(kubectl get pods -l app=web-app -o jsonpath="{.items[0].metadata.name}")
+
+# Immediately list pods:
+kubectl get pods -l app=web-app
+
+Observation: The Deployment Controller immediately detects that current replicas (1) do not match desired replicas (2), scheduling an immediate replacement[cite: 2].
+
+3.3 Decoupling Configuration: ConfigMaps & Secrets
+To satisfy 12-Factor app architecture, configuration must be decoupled from container images.
+
+Save as app-config.yaml:
+
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+data:
+  APP_ENV: "production"
+  FEATURE_FLAG: "enabled"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-secret
+type: Opaque
+stringData:
+  DB_PASSWORD: "SuperSecretPassword123"
+
+
+Apply the configuration:
+
+kubectl apply -f app-config.yaml
+
+Update nginx-deployment.yaml to inject the configuration:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  labels:
+    tier: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        envFrom:
+        - configMapRef:
+            name: web-config
+        - secretRef:
+            name: web-secret
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "250m"
+            memory: "128Mi"
+
+Apply and verify variable injection:
+
+kubectl apply -f nginx-deployment.yaml
+
+POD_NAME=$(kubectl get pods -l app=web-app --field-selector=status.phase=Running -o jsonpath="{.items[0].metadata.name}")
+kubectl exec $POD_NAME -- env | grep -E "APP_ENV|FEATURE_FLAG|DB_PASSWORD"
+
+
+3.4 Service Discovery, Endpoints, & EndpointSlices
+Because Pod IP addresses are ephemeral, a Service provides a durable DNS name and virtual IP (ClusterIP).
+
+Save as web-service.yaml:
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+spec:
+  type: ClusterIP
+  selector:
+    app: web-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+
+
+Apply and inspect the discovered IP mappings:
+
+Bash
+
+kubectl apply -f web-service.yaml
+
+# Verify Service creation
+kubectl get svc web-service
+
+# Check EndpointSlice (modern replacement for Endpoints)
+kubectl get endpointslice -l kubernetes.io/service-name=web-service
+
+Access the service locally from Codespaces:
+
+kubectl port-forward service/web-service 8080:80
+
+(Codespaces prompts an "Open in Browser" notification under the Ports view to confirm HTTP 200 from Nginx).
+

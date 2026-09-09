@@ -1,0 +1,13 @@
+The goal of Day 1 is to bridge the gap between theoretical cluster architecture and hands-on, production-grade DevOps practices. By the end of this session, you will understand:
+
+How Kubernetes control plane and worker node components interact under the hood.
+
+How to set up and manage a local development cluster using Minikube in GitHub Codespaces.
+
+How to deploy and manage workloads declaratively using Deployments, ReplicaSets, and Pods.
+
+How to decouple application settings using ConfigMaps and Secrets.
+
+How internal service discovery works via Services, Endpoints, and EndpointSlices.
+
+Real-world troubleshooting techniques for container configuration errors.

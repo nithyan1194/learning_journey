@@ -1,0 +1,7 @@
+With the fundamentals of workloads, configuration, and cluster networking completed, the next logical phase focuses on:
+
+Container Probes & Health Checks: Implementing livenessProbe, readinessProbe, and startupProbe to automate endpoint routing and crash restarts.
+
+Persistent Storage: Moving away from ephemeral storage using PersistentVolumes (PV), PersistentVolumeClaims (PVC), and dynamic StorageClasses.
+
+
