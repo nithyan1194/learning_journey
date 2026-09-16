@@ -1,7 +1,19 @@
-With the fundamentals of workloads, configuration, and cluster networking completed, the next logical phase focuses on:
+In Day 1, you learned how Deployments ensure Pod count and how Services discover Pod IPs using 
+EndpointSlices. Today, we dive into two critical production concepts:
 
-Container Probes & Health Checks: Implementing livenessProbe, readinessProbe, and startupProbe to automate endpoint routing and crash restarts.
+Application-Level Health Checking: Preventing broken Pods from receiving traffic (Readiness) or
+ restarting deadlock processes (Liveness).
 
-Persistent Storage: Moving away from ephemeral storage using PersistentVolumes (PV), PersistentVolumeClaims (PVC), and dynamic StorageClasses.
+Stateful Storage: Storing data so it survives Pod deletions and restarts using Persistent Volumes 
+(PV) and Persistent Volume Claims (PVC).
+
+With the fundamentals of workloads, configuration, and cluster networking completed, the next logical 
+phase focuses on:
+
+Container Probes & Health Checks: Implementing livenessProbe, readinessProbe, and startupProbe to automate 
+endpoint routing and crash restarts.
+
+Persistent Storage: Moving away from ephemeral storage using PersistentVolumes (PV), PersistentVolumeClaims (PVC),
+ and dynamic StorageClasses.
 
 

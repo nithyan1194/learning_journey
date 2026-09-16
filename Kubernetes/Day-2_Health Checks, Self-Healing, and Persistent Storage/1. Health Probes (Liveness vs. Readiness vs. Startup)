@@ -1,0 +1,6 @@
+Health Probes (Liveness vs. Readiness vs. Startup)
+
+By default, Kubernetes only checks if the container's main process is running. If your app deadlocks,
+hangs on an infinite loop, or loses its DB connection while keeping the process alive, Kubernetes thinks
+it is healthy. Probes solve this.
+
