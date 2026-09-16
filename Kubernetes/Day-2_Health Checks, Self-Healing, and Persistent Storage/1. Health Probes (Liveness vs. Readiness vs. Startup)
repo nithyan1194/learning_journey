@@ -1,6 +1,20 @@
-Health Probes (Liveness vs. Readiness vs. Startup)
+In Day 1, you learned how Deployments ensure Pod count and how Services discover Pod IPs using EndpointSlices. Today, we dive into two critical production concepts:
+
+Application-Level Health Checking: Preventing broken Pods from receiving traffic (Readiness) or restarting deadlock processes (Liveness).
+
+Stateful Storage: Storing data so it survives Pod deletions and restarts using Persistent Volumes (PV) and Persistent Volume Claims (PVC).
+
+Part 1: Health Probes (Liveness vs. Readiness vs. Startup)
 
 By default, Kubernetes only checks if the container's main process is running. If your app deadlocks,
 hangs on an infinite loop, or loses its DB connection while keeping the process alive, Kubernetes thinks
 it is healthy. Probes solve this.
+
+
+|   Probe Type   |                        What it monitors                       |                                           Action when it fails                                          |
+|:--------------:|:-------------------------------------------------------------:|:-------------------------------------------------------------------------------------------------------:|
+| startupProbe   | Is the legacy/heavy application finished booting up?          | Disables liveness/readiness checks until it succeeds. Kills and restarts the container if it times out. |
+| readinessProbe | Is the application ready to accept user traffic?              | Removes the Pod IP from the Service/EndpointSlice. The container is not restarted.                      |
+| livenessProbe  | Is the application in an unrecoverable deadlock/frozen state? | Restarts the container (kubelet kills and recreates the container process)                              |
+
 

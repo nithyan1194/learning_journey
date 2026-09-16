@@ -1,0 +1,98 @@
+
+Health probes act as Kubernetes' eyes and ears inside your running containers. Without probes, Kubernetes only knows if the container's PID 1 process has terminated. If a process enters an infinite loop, memory leak deadlock, or connection pool exhaustion, the process remains technically "running," yet the application is entirely broken.
+
+Deep Dive: The Three Probe Types
+
+ Probe Type   |              The Question It Asks             |                When It Executes               | Action on Failure                                                                               | Typical Real-World Use Case                                                      |
+|:--------------:|:---------------------------------------------:|:---------------------------------------------:|-------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|
+| startupProbe   | "Has the app initialized yet?"                | Only during initial container launch.         | Kills container and restarts it (restartPolicy). Disables liveness & readiness until it passes. | Heavy legacy apps, JVM/Spring Boot warmup, running DB schema migrations on boot. |
+| readinessProbe | "Can the app take user traffic right now?"    | Periodically throughout the entire lifecycle. | Cuts network traffic by detaching Pod IP from EndpointSlice. No restart.                        | App is temporarily overloaded, warming up internal cache, or lost DB connection. |
+| livenessProbe  | "Is the app stuck in an unrecoverable state?" | Periodically after startup succeeds.          | Restarts container (kubelet terminates and re-spawns the container process).                    | Catching deadlocks, frozen event loops, or unhandled fatal thread exceptions.    |
+
+
+Probe Lifecycle & Execution Flow
+
++-----------------------+
+                                  |    Container Starts   |
+                                  +-----------+-----------+
+                                              |
+                                              v
+                             +---------------------------------+
+                             |    Is startupProbe defined?     |
+                             +----------------+----------------+
+                                              |
+                       YES                    |                    NO
+         +------------------------------------+------------------------------------+
+         |                                                                         |
+         v                                                                         v
++------------------+   FAILS (exceeds failureThreshold)   +------------------------------------+
+|  startupProbe    | -----------------------------------> | KILL & RESTART CONTAINER           |
+|  Polls App       |                                      +------------------------------------+
++--------+---------+                                                               ^
+         |                                                                         |
+         | SUCCEEDS                                                                |
+         +------------------------------------+                                    |
+                                              |                                    |
+                                              v                                    |
+                        +-------------------------------------------+              |
+                        | Liveness & Readiness Poll in Parallel     |              |
+                        +---------------------+---------------------+              |
+                                              |                                    |
+                       +----------------------+----------------------+             |
+                       |                                             |             |
+                       v                                             v             |
+             +--------------------+                        +--------------------+  |
+             |   livenessProbe    |                        |   readinessProbe   |  |
+             +---------+----------+                        +---------+----------+  |
+                       |                                             |             |
+         +-------------+-------------+                 +-------------+-------------+
+         |                           |                 |                           |
+      FAILS                       PASSES            PASSES                       FAILS
+         |                           |                 |                           |
+         v                           v                 v                           v
++------------------+        +------------------+  +------------------+   +-------------------+
+| KILL & RESTART   |        | Maintain Current |  | Attach IP to     |   | Remove IP from    |
+| CONTAINER (Loop) |        | Running State    |  | EndpointSlice    |   | EndpointSlice     |
++------------------+        +------------------+  | (Serve Traffic)  |   | (Drop Traffic)    |
+                                                  +------------------+   +-------------------+
+
+
+How Probes Check Application Health
+
+httpGet: Sends an HTTP GET request. Any response status ≥200 and <400 is marked as success.
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+
+tcpSocket: Attempts a TCP handshake on a specific port. Useful for non-HTTP services like databases, Redis, or gRPC endpoints.
+
+livenessProbe:
+  tcpSocket:
+    port: 5432
+
+exec: Runs an arbitrary command inside the container namespace. Return code 0 is success; non-zero is failure.
+
+livenessProbe:
+  exec:
+    command:
+    - cat
+    - /tmp/healthy
+
+Tuning Parameters & The "Deadly Cascading Failure" Trap
+Misconfiguring probes is one of the most common causes of production outages:
+
+initialDelaySeconds: How long to wait before firing the first check.
+
+periodSeconds: How frequently to poll the container (e.g., every 5s or 10s).
+
+timeoutSeconds: Seconds before considering a non-responsive check a timeout failure.
+
+failureThreshold: Number of consecutive failures required before taking action.
+
+Production Pitfall: Never tie a livenessProbe directly to an external database call. If your database becomes slow under peak load, your database queries will time out. A naive livenessProbe checking that database query will fail, causing Kubernetes to simultaneously kill and restart all your application pods. The restarted pods will hammer the database with new connection pools upon boot, causing a total cluster-wide blackout.
+
+Rule of thumb: Keep livenessProbe checking only internal memory/deadlock state, and let readinessProbe handle temporary downstream dependency failures.
+
+
