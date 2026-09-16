@@ -1,0 +1,92 @@
+Hands-On Lab 1: Simulating Readiness Failures
+
+Let’s deploy an application where we can manually toggle health to watch readinessProbe cut off traffic without killing the pod.
+
+1. Create the Manifest (probes-demo.yaml)
+
+cat <<EOF > probes-demo.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probe-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: probe-app
+  template:
+    metadata:
+      labels:
+        app: probe-app
+    spec:
+      containers:
+      - name: web
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 2
+          periodSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: probe-service
+spec:
+  type: ClusterIP
+  selector:
+    app: probe-app
+  ports:
+  - port: 80
+    targetPort: 80
+EOF
+
+kubectl apply -f probes-demo.yaml
+
+
+2. Observe the Initial State
+
+Check the pods immediately:
+
+kubectl get pods -l app=probe-app
+
+Notice: Under READY, you will see 0/1. Why? Because Nginx returns a 404 Not Found for /healthz out of the box! The container is Running, but the readiness probe fails.
+
+Check your endpoints:
+
+kubectl get endpoints probe-service
+
+Notice: The ENDPOINTS column will be completely empty (<none>). Kubernetes refuses to send traffic to an unready pod.
+
+3. Make One Pod Healthy
+
+Let's create the /healthz file inside only one of the running pods:
+
+FIRST_POD=$(kubectl get pods -l app=probe-app -o jsonpath="{.items[0].metadata.name}")
+
+# Create the health endpoint file inside nginx web root
+kubectl exec $FIRST_POD -- touch /usr/share/nginx/html/healthz
+
+4. Check Endpoints Again
+
+kubectl get pods -l app=probe-app
+kubectl get endpoints probe-service
+
+Verification:
+
+The first pod will transition to 1/1 READY.
+
+The second pod remains 0/1 READY.
+
+kubectl get endpoints probe-service will now list only the IP of the healthy pod!
+
+Run these steps in your Codespaces terminal, and verify the output of kubectl get endpoints probe-service.
