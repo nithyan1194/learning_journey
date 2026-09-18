@@ -1,6 +1,3 @@
-#1. Create the Manifest (probes-demo.yaml)
-
-cat <<EOF > probes-demo.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -44,6 +41,3 @@ spec:
   ports:
   - port: 80
     targetPort: 80
-EOF
-
-#kubectl apply -f probes-demo.yaml
