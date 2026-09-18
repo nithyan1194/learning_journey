@@ -56,6 +56,12 @@ Probe Lifecycle & Execution Flow
 +------------------+        +------------------+  | (Serve Traffic)  |   | (Drop Traffic)    |
                                                   +------------------+   +-------------------+
 
+Production Probe Traps
+Cascading Failures: Do not configure a livenessProbe to ping a shared downstream database. If the database experiences high latency, every application container's liveness check will time out simultaneously, causing a cluster-wide restart loop. Use readinessProbe for downstream checks instead.
+
+Aggressive Timeouts: Always provide an adequate initialDelaySeconds or leverage a dedicated startupProbe to avoid premature pod kills during initialization.
+
+
 
 How Probes Check Application Health
 

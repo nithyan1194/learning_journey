@@ -1,0 +1,6 @@
+Day 2 focused on application-layer reliability and state management. While Day 1 covered pod scheduling and basic service discovery, Day 2 addressed two production requirements:
+
+Controlling how and when Kubernetes routes traffic to containers using Startup, Readiness, and Liveness Probes.
+
+Persisting state beyond pod lifecycles using StorageClasses, PersistentVolumes (PV), and PersistentVolumeClaims (PVC).
+
