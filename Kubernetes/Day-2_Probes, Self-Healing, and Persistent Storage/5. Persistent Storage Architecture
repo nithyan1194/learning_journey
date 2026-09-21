@@ -1,0 +1,39 @@
+Container storage is ephemeral; data written inside a container layer is deleted 
+when the container restarts. Kubernetes decouples storage management into 
+three distinct layers:
+
++-----------------------------------------------------------+
+|                    StorageClass (SC)                      |  Blueprint defining the dynamic provisioner
+|        (e.g., k8s.io/minikube-hostpath, AWS gp3)          |  (Creates actual storage on demand)
++-----------------------------+-----------------------------+
+                              |
+                              v  Dynamically provisions
++-----------------------------------------------------------+
+|                  PersistentVolume (PV)                    |  Cluster-wide storage volume allocated on the 
+|               Capacity: 500Mi, Access: RWO                |  underlying disk or cloud provider
++-----------------------------+-----------------------------+
+                              |
+                              v  Binds 1:1
++-----------------------------------------------------------+
+|               PersistentVolumeClaim (PVC)                 |  Namespace-scoped user request for storage size
+|             web-data-pvc (Requests: 500Mi)                |  and access modes
++-----------------------------+-----------------------------+
+                              |
+                              v  Mounted via volumeMounts
++-----------------------------------------------------------+
+|                      Pod Deployment                       |  Application consumes storage via a mount path
+|           mountPath: /usr/share/nginx/html                |  like a local directory
++-----------------------------------------------------------+
+
+
+Volume Access Modes
+ReadWriteOnce (RWO): Volume can be mounted as read-write by a single node at a time (standard block storage, EBS, hostpath).
+
+ReadOnlyMany (ROX): Volume can be mounted read-only by many nodes concurrently.
+
+ReadWriteMany (RWX): Volume can be mounted read-write by multiple nodes simultaneously (network filesystems like NFS, AWS EFS).
+
+ReadWriteOncePod (RWOP): Volume can be mounted as read-write by a single Pod across the entire cluster.
+
+4. Completed Hands-On
+

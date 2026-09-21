@@ -1,0 +1,25 @@
+Lab 1: Readiness Failure & Traffic Isolation
+Goal: Verify that a failing readiness probe stops traffic routing without killing the container.
+
+Observation: When /healthz was missing, the deployment reported 0/1 READY, and kubectl get endpoints probe-service returned <none>.
+
+Resolution: Creating the /healthz file inside the pod instantly allowed the readiness probe to pass, adding the Pod's IP back into the EndpointSlice.
+
+
+Lab 2: Dynamic Volume Provisioning & Persistence
+Goal: Verify data durability across pod deletion.
+
+Implementation:
+
+Requested storage using a PersistentVolumeClaim named web-data-pvc (500Mi, ReadWriteOnce).
+
+The default StorageClass automatically provisioned a PersistentVolume and transitioned the claim to Bound.
+
+Wrote data inside the mounted directory:
+
+kubectl exec $POD_NAME -- sh -c 'echo "Kubernetes Day 2 Storage Confirmed" > /usr/share/nginx/html/index.html'
+
+Deleted the pod with kubectl delete pod $POD_NAME.
+
+The Deployment controller spawned a replacement pod, re-mounted the exact same PV, and confirmed data persistence when querying /usr/share/nginx/html/index.html.
+

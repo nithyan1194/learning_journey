@@ -1,0 +1,8 @@
+Day 3 Roadmap
+
+With workload health and data persistence completed, the next phase covers cluster ingress and automated scaling:
+
+Ingress Controllers & Path-Based Routing: Moving beyond port-forwarding to expose multiple services using host and path rules (e.g., /api vs /web).
+
+Horizontal Pod Autoscaling (HPA): Deploying the Kubernetes Metrics Server and configuring automated scaling based on CPU and memory thresholds.
+

@@ -10,6 +10,9 @@ By default, Kubernetes only checks if the container's main process is running. I
 hangs on an infinite loop, or loses its DB connection while keeping the process alive, Kubernetes thinks
 it is healthy. Probes solve this.
 
+Container Health Probes
+Kubernetes natively detects crashed processes (PID 1 exits), but it cannot detect application-level deadlocks, frozen event loops, or slow warmups without active probes.
+
 
 |   Probe Type   |                        What it monitors                       |                                           Action when it fails                                          |
 |:--------------:|:-------------------------------------------------------------:|:-------------------------------------------------------------------------------------------------------:|
@@ -17,4 +20,10 @@ it is healthy. Probes solve this.
 | readinessProbe | Is the application ready to accept user traffic?              | Removes the Pod IP from the Service/EndpointSlice. The container is not restarted.                      |
 | livenessProbe  | Is the application in an unrecoverable deadlock/frozen state? | Restarts the container (kubelet kills and recreates the container process)                              |
 
+
+| Probe Type     | The Question It Asks                                        | Action on Failure                                                                                           | Typical DevOps Use Case                                                                            |
+|----------------|-------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| Probe          | "Has the container finished booting up?"                    | Kills and restarts the container; temporarily disables liveness and readiness checks.                       | Heavy JVM/Spring apps, database schema migrations, warming large internal memory caches.           |
+| readinessProbe | "Is the container ready to process live traffic?"           | Detaches the Pod IP from the EndpointSlice / Service. The container keeps running; no restart is triggered. | Gracefully draining traffic during transient backend slowness or downstream dependency reconnects. |
+| livenessProbe  | "Is the process stuck in an unrecoverable freeze/deadlock?" | Restarts the container (kubelet terminates PID 1 and restarts the container according to restartPolicy).    | Catching fatal execution freezes, locked threads, or unhandled exceptions.                         |
 
