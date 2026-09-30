@@ -1,0 +1,90 @@
+Why Ephemeral Storage Fails
+
+Containers have an ephemeral root filesystem. If a pod running a database crashes or gets rescheduled to another node, all writes stored inside the container disappear.
+
+To solve this, Kubernetes decouples storage into three layers:
+
+StorageClass (SC): The storage backend blueprint (e.g., AWS EBS, GCP PD, or local hostpath in Minikube) that enables dynamic provisioning.
+
+PersistentVolume (PV): An actual piece of allocated storage in the cluster.
+
+PersistentVolumeClaim (PVC): A request/ticket submitted by an application declaring how much storage and what access mode it needs.
+
+
++------------------------------------+
+       |            StorageClass            | (Provisioner Engine)
+       +-----------------+------------------+
+                         |
+                         v (Dynamically creates)
++---------------------------------------------------+
+|               PersistentVolume (PV)               | (Cluster-wide resource)
+|               Capacity: 1Gi, ReadWriteOnce        |
++------------------------+--------------------------+
+                         |
+                         | Bound to
+                         v
++---------------------------------------------------+
+|            PersistentVolumeClaim (PVC)            | (Namespace-scoped request)
+|            Requests: 1Gi                          |
++------------------------+--------------------------+
+                         |
+                         | Mounted as volume
+                         v
++---------------------------------------------------+
+|                     Pod Spec                      |
+|            volumeMounts: /usr/share/nginx/html    |
++---------------------------------------------------+
+
+Step 1: Check the Default StorageClass in Minikube
+
+Minikube comes with a built-in dynamic provisioner out of the box:
+
+kubectl get storageclass
+
+You will see standard (default) using the k8s.io/minikube-hostpath provisioner.
+
+Step 2: Create a PersistentVolumeClaim (PVC)
+
+Save this manifest as storage-demo.yaml:
+
+cat <<EOF > storage-demo.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: web-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: persistent-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: persistent-web
+  template:
+    metadata:
+      labels:
+        app: persistent-web
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: html-storage
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: html-storage
+        persistentVolumeClaim:
+          claimName: web-data-pvc
+EOF
+
+kubectl apply -f storage-demo.yaml

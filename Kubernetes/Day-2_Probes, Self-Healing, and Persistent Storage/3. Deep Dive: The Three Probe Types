@@ -87,6 +87,7 @@ livenessProbe:
     - /tmp/healthy
 
 Tuning Parameters & The "Deadly Cascading Failure" Trap
+
 Misconfiguring probes is one of the most common causes of production outages:
 
 initialDelaySeconds: How long to wait before firing the first check.

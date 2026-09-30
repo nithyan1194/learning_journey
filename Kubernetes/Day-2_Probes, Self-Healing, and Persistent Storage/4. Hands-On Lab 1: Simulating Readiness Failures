@@ -81,6 +81,15 @@ kubectl exec $FIRST_POD -- touch /usr/share/nginx/html/healthz
 kubectl get pods -l app=probe-app
 kubectl get endpoints probe-service
 
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+
+NAME            ENDPOINTS        AGE
+
+probe-service   10.244.0.14:80   19m
+
+That confirms the readiness probe is doing its job: only the single healthy pod (10.244.0.14:80) is receiving traffic through probe-service, while the other pod is kept isolated without being restarted.
+
+
 Verification:
 
 The first pod will transition to 1/1 READY.
