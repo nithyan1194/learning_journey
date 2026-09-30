@@ -88,3 +88,55 @@ spec:
 EOF
 
 kubectl apply -f storage-demo.yaml
+
+
+Step 3: Verify Dynamic Binding
+
+Check that Minikube automatically created a backing PV and bound it to your claim:
+
+kubectl get pvc web-data-pvc
+kubectl get pv
+
+Both should show a status of Bound.
+
+Step 4: Test Data Persistence Across Pod Deletion
+
+Write a custom file onto the mounted volume inside the pod:
+
+POD_NAME=$(kubectl get pods -l app=persistent-web -o jsonpath="{.items[0].metadata.name}")
+
+# Write a persistent message
+kubectl exec $POD_NAME -- sh -c 'echo "Kubernetes Day 2 Storage Confirmed" > /usr/share/nginx/html/index.html'
+
+# Verify the file is served
+kubectl exec $POD_NAME -- cat /usr/share/nginx/html/index.html
+
+The terminal should output: Kubernetes Day 2 Storage Confirmed.
+
+Step 2: Delete the Pod to Test Persistence
+
+Delete the current running pod:
+
+Now, kill the pod and watch Kubernetes spawn a replacement:
+
+kubectl delete pod $POD_NAME
+
+# Wait for the replacement pod to be Running
+kubectl get pods -l app=persistent-web -w
+
+Once the new pod is running, verify that the data survived:
+
+Step 3: Confirm Data Survived the Deletion
+
+Retrieve the new pod's name and read the file from the persistent volume:
+
+NEW_POD=$(kubectl get pods -l app=persistent-web -o jsonpath="{.items[0].metadata.name}")
+kubectl exec $NEW_POD -- cat /usr/share/nginx/html/index.html
+
+Run these commands and paste the final cat output.
+
+Kubernetes Day 2 Storage Confirmed
+
+Verification: The terminal should still output Kubernetes Day 2 Storage Confirmed, proving that the data was safely stored on the underlying PersistentVolume and re-mounted to the new pod.
+
+
