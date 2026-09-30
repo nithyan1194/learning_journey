@@ -1,40 +1,3 @@
-Why Ephemeral Storage Fails
-
-Containers have an ephemeral root filesystem. If a pod running a database crashes or gets rescheduled to another node, all writes stored inside the container disappear.
-
-To solve this, Kubernetes decouples storage into three layers:
-
-StorageClass (SC): The storage backend blueprint (e.g., AWS EBS, GCP PD, or local hostpath in Minikube) that enables dynamic provisioning.
-
-PersistentVolume (PV): An actual piece of allocated storage in the cluster.
-
-PersistentVolumeClaim (PVC): A request/ticket submitted by an application declaring how much storage and what access mode it needs.
-
-
-+------------------------------------+
-       |            StorageClass            | (Provisioner Engine)
-       +-----------------+------------------+
-                         |
-                         v (Dynamically creates)
-+---------------------------------------------------+
-|               PersistentVolume (PV)               | (Cluster-wide resource)
-|               Capacity: 1Gi, ReadWriteOnce        |
-+------------------------+--------------------------+
-                         |
-                         | Bound to
-                         v
-+---------------------------------------------------+
-|            PersistentVolumeClaim (PVC)            | (Namespace-scoped request)
-|            Requests: 1Gi                          |
-+------------------------+--------------------------+
-                         |
-                         | Mounted as volume
-                         v
-+---------------------------------------------------+
-|                     Pod Spec                      |
-|            volumeMounts: /usr/share/nginx/html    |
-+---------------------------------------------------+
-
 Step 1: Check the Default StorageClass in Minikube
 
 Minikube comes with a built-in dynamic provisioner out of the box:
@@ -138,5 +101,3 @@ Run these commands and paste the final cat output.
 Kubernetes Day 2 Storage Confirmed
 
 Verification: The terminal should still output Kubernetes Day 2 Storage Confirmed, proving that the data was safely stored on the underlying PersistentVolume and re-mounted to the new pod.
-
-
