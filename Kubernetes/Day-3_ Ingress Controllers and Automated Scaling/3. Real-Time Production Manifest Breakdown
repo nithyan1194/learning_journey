@@ -1,0 +1,56 @@
+Here is what a complete multi-domain, path-routed Ingress manifest looks like in production:
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shopzone-ingress
+  annotations:
+    # URL rewriting: strip prefix before forwarding to backend container
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # Enforce SSL redirection
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  # Links this rule to the cluster's Nginx Ingress Controller
+  ingressClassName: nginx
+
+  # TLS Termination (HTTPS on port 443)
+  tls:
+  - hosts:
+      - shopzone.com
+      - api.shopzone.com
+    secretName: shopzone-tls-cert  # Secret containing tls.crt and tls.key
+
+  rules:
+  # Route 1: Path-based routing under the main website domain
+  - host: shopzone.com
+    http:
+      paths:
+      # Traffic to shopzone.com/products goes to product microservice
+      - path: /products(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: product-service
+            port:
+              number: 8080
+
+      # Traffic to shopzone.com/cart goes to checkout microservice
+      - path: /cart(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: cart-service
+            port:
+              number: 3000
+
+  # Route 2: Host-based (subdomain) routing
+  - host: api.shopzone.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-api-service
+            port:
+              number: 5000

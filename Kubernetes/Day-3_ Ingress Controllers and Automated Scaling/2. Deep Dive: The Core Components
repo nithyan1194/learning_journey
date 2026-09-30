@@ -1,0 +1,60 @@
+Deep Dive: The Core Components
+An Ingress setup requires four distinct components working in tandem:
+
+[ Public Internet: shopzone.com ]
+               |
+               v
+1. [ Cloud Load Balancer (AWS NLB / GCP LB) ]   <- Single External Public IP
+               |
+               v
+2. [ Ingress Controller (e.g., ingress-nginx) ] <- Reverse Proxy Pod running in cluster
+               |
+               +--- Watches Ingress Resource (3) for rules
+               |
+   +-----------+-----------+
+   | (Path: /products)     | (Path: /cart)
+   v                       v
+4. [ product-service ]   4. [ cart-service ]     <- Internal ClusterIP Services
+   |                       |
+   v                       v
+ [ Pod 1 ] [ Pod 2 ]     [ Pod 1 ] [ Pod 2 ]     <- Pod Endpoints
+
+
+ 1. The Ingress Resource (kind: Ingress)
+What it is: A declarative YAML file where you define your routing rules.
+
+What it does: It stores instructions in etcd specifying:
+
+Which hostnames to accept (e.g., shopzone.com).
+
+Which paths route to which services (e.g., /products → product-service:80).
+
+TLS/SSL certificate secrets.
+
+Key Point: An Ingress resource by itself is just passive metadata stored in etcd. 
+It does not route any packets unless an Ingress Controller is actively running.
+
+2. The Ingress Controller
+What it is: The active application daemon running inside the cluster (popular options: NGINX Ingress, Traefik, HAProxy, Envoy/Emissary).
+
+What it does: It continuously watches the kube-apiserver for Ingress resources. Whenever you apply an Ingress YAML:
+
+It reads your path and host rules.
+
+It dynamically regenerates its internal reverse proxy configuration (e.g., nginx.conf).
+
+It reloads its routing tables in memory without dropping connections.
+
+In enterprise setups, the Ingress Controller Pods are fronted by a Service of type: LoadBalancer or NodePort so external internet traffic can reach them.
+
+3. The IngressClass
+What it is: An abstraction introduced in modern Kubernetes (v1.18+) to manage multiple ingress controllers in the same cluster.
+
+What it does: If your cluster runs two controllers—such as an external NGINX controller for public users and an internal Traefik controller for private corporate VPN traffic—the ingressClassName field in your Ingress manifest tells Kubernetes precisely which controller must execute the rules.
+
+4. Backend Services & EndpointSlices
+What they are: Standard Kubernetes ClusterIP services pointing to your application pods.
+
+What they do: When the Ingress Controller receives a request for /cart, it queries the Service’s EndpointSlice to find the exact private IP addresses of the running cart pods and proxies the HTTP request directly to a healthy container.
+
+
