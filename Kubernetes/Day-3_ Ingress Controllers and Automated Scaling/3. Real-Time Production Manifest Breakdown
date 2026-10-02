@@ -54,3 +54,24 @@ spec:
             name: backend-api-service
             port:
               number: 5000
+
+
+Step-by-Step Request Lifecycle
+
+When a user visits [https://shopzone.com/cart](https://shopzone.com/cart):
+
+1.DNS Resolution: The client browser queries DNS for shopzone.com and receives the external IP of the Cloud Load Balancer.
+
+2.Edge Ingestion: The Cloud Load Balancer forwards the raw TCP packet on port 443 to the ingress-nginx-controller Pod running on a worker node.
+
+3.TLS Termination: The Ingress Controller decrypts the HTTPS traffic using the certificate found in shopzone-tls-cert.
+
+4.Header Evaluation: The controller inspects the HTTP request:
+
+  1.Host header matches shopzone.com.
+
+  2.URI path matches /cart.
+
+5.Upstream Resolution: The controller checks the internal EndpointSlice for cart-service to retrieve available pod IPs (e.g., 10.244.1.18:3000).
+
+6.Reverse Proxying: The controller forwards the HTTP request to the selected container, receives the response, and streams it back to the user’s browser.
