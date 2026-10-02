@@ -1,0 +1,62 @@
+A proxy (forward proxy) acts on behalf of clients to access the outside world, while a reverse proxy acts on behalf of backend servers to receive requests from the outside world.
+
+FORWARD PROXY (Protects / Represents the Client)
+[ Client A ] --+
+[ Client B ] --+--> [ Forward Proxy ] ----> ( The Public Internet ) ----> [ Destination Web Server ]
+[ Client C ] --+     (Corporate/VPN)
+
+
+REVERSE PROXY (Protects / Represents the Server)
+( External Users ) ----> [ Reverse Proxy ] --+----> [ Backend Microservice 1 ]
+  (Internet)               (Ingress/NGINX)   +----> [ Backend Microservice 2 ]
+                                             +----> [ Backend Microservice 3 ]
+
+
+1. Forward Proxy (The Client’s Representative)
+A forward proxy sits in front of one or more client devices (such as laptops inside an office network). When a user browses the web, their computer sends the request to the forward proxy first, which forwards the request to the target website on their behalf.
+
+Who it hides: It hides the client’s real identity and IP address from the destination server.
+
+Key Functions:
+
+Content Filtering & Compliance: Corporate networks use forward proxies to block access to restricted domains (e.g., social media or malicious domains).
+
+Client Caching: If 500 employees download the same operating system patch, the forward proxy downloads it once and serves it locally, saving external bandwidth.
+
+Anonymity & Privacy: Commercial VPNs act as forward proxies, making external sites see the proxy’s IP address instead of the user’s home IP.
+
+2. Reverse Proxy (The Server’s Gatekeeper)
+A reverse proxy sits in front of backend servers. External users do not talk directly to backend databases or application microservices; instead, they send HTTP requests to the reverse proxy, which evaluates the request and forwards it to an internal server.
+
+Who it hides: It hides the existence, topology, and private IP addresses of your backend servers from external clients.
+
+Key Functions:
+
+Load Balancing: Distributes incoming HTTP requests evenly across multiple backend replicas to prevent bottlenecks.
+
+SSL/TLS Termination: Handles the CPU-heavy work of decrypting HTTPS certificates at the perimeter, allowing backend services to communicate via lightweight HTTP internally.
+
+Path & Host Routing: Directs /api requests to a Node.js cluster and /static requests to an S3 bucket or CDN.
+
+DDoS & Security Shielding: Serves as a defensive barrier (Web Application Firewall) that drops malicious payloads before they ever touch your application code.        
+
+| Feature           | Forward Proxy                                    | Reverse Proxy                                     |
+|-------------------|--------------------------------------------------|---------------------------------------------------|
+| Who it represents | The Client                                       | The Server                                        |
+| Location          | In front of user clients (local network/VPN)     | In front of private backend servers               |
+| Identity Hidden   | Client IP is hidden from the web server          | Backend server IPs/ports are hidden from the user |
+| Awareness         | Client usually configures the proxy explicitly   | Client has no idea a proxy exists behind the URL  |
+| Primary Goal      | Monitor, filter, and protect client traffic      | Protect, balance, and route server workloads      |
+| Examples          | Squid, Charles Proxy, Corporate Zscaler/BlueCoat | NGINX, HAProxy, Envoy, Traefik                    |
+
+
+How This Applies to Kubernetes
+In Kubernetes networking, these concepts show up in two distinct places:
+
+The Ingress Controller is a Reverse Proxy:
+
+When you deployed the NGINX Ingress controller in the previous step, you deployed a production reverse proxy. External clients query your domain name, and the Ingress Controller pod terminates the connection, reads the URL path (/apple or /banana), looks up the Pod IP in the EndpointSlice, and proxies the traffic internally.
+
+The kube-proxy Clarification:
+
+Despite having "proxy" in its name, modern kube-proxy does not act as a traditional Layer 7 reverse proxy. Instead, it writes Linux kernel routing rules (iptables or IPVS) on each node to forward Layer 4 TCP/UDP packets straight to Pod IPs.
