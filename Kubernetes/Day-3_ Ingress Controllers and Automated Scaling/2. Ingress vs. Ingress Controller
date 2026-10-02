@@ -1,0 +1,25 @@
+Ingress Resource: A YAML declaration defining HTTP rules (e.g., api.example.com goes to api-service, /store goes to shop-service).
+
+Ingress Controller: The actual running daemon (usually an Nginx, Traefik, or Envoy reverse proxy) that watches the API server for Ingress rules and routes network packets.
+
+Internet Traffic (HTTP: 80 / HTTPS: 443)
+                          |
+                          v
+        +-----------------------------------+
+        |      Ingress Controller Pod       | (e.g., ingress-nginx)
+        +-----------------+-----------------+
+                          |
+             Path-based Routing Evaluation
+             +------------+------------+
+             |                         |
+       Path: /apple              Path: /banana
+             |                         |
+             v                         v
+   +-------------------+     +-------------------+
+   |  apple-service    |     |  banana-service   | (ClusterIP: Port 80)
+   +---------+---------+     +---------+---------+
+             |                         |
+             v                         v
+     [ apple pods ]            [ banana pods ]
+
+     

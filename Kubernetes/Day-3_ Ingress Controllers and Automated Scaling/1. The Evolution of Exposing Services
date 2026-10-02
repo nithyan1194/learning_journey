@@ -1,0 +1,11 @@
+
+Before configuring Ingress, let's clarify how external traffic reaches a cluster.
+
+The Evolution of Exposing Services
+
+| Service Type | How It Works                                                                                                | Limitations / Production Fit                                                                            |
+|--------------|-------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| ClusterIP    | Internal virtual IP only accessible within cluster nodes and pods.                                          | Default. Cannot be reached from outside without a proxy or port-forward.                                |
+| NodePort     | Opens a dedicated high port (30000–32767) across every worker node IP.                                      | Exposes random ports, bypasses standard 80/443, insecure for production web apps.                       |
+| LoadBalancer | Provisions a dedicated cloud load balancer (e.g., AWS NLB/ALB, GCP LB).                                     | Expensive: allocating 20 cloud LBs for 20 microservices drives up infrastructure costs.                 |
+| Ingress      | Layer 7 (HTTP/HTTPS) reverse proxy router. Routes many domain names and paths through a single entry point. | Production standard: 1 Cloud LoadBalancer → Ingress Controller → dozens of internal ClusterIP services. |

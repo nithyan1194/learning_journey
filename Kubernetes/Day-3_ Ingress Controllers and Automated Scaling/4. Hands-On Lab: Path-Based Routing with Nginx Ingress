@@ -1,0 +1,158 @@
+Step 1: Enable the Minikube Ingress Addon
+
+Minikube includes a pre-packaged Nginx Ingress Controller addon:
+
+minikube addons enable ingress
+
+Verify that the Ingress Controller pod is running inside the ingress-nginx namespace:
+
+kubectl get pods -n ingress-nginx -w
+
+(Wait until ingress-nginx-controller-... shows 1/1 Running, then press Ctrl+C.)
+
+@nithyan1194 ➜ /workspaces/learning_journey (main) $ kubectl get pods -n ingress-nginx -w
+NAME                                        READY   STATUS      RESTARTS   AGE
+ingress-nginx-admission-create-69cvj        0/1     Completed   0          62s
+ingress-nginx-admission-patch-jmdlk         0/1     Completed   1          62s
+ingress-nginx-controller-596f8778bc-bl9pd   1/1     Running     0          62s
+
+
+Step 2: Deploy Two Backend Microservices
+
+Let's deploy two lightweight web servers representing independent backend services:
+
+cat <<EOF > apps.yaml
+# App 1: Apple Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apple-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apple
+  template:
+    metadata:
+      labels:
+        app: apple
+    spec:
+      containers:
+      - name: apple-app
+        image: hashicorp/http-echo
+        args: ["-text=Apple Service Response"]
+        ports:
+        - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apple-service
+spec:
+  type: ClusterIP
+  selector:
+    app: apple
+  ports:
+  - port: 5678
+    targetPort: 5678
+---
+# App 2: Banana Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banana-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banana
+  template:
+    metadata:
+      labels:
+        app: banana
+    spec:
+      containers:
+      - name: banana-app
+        image: hashicorp/http-echo
+        args: ["-text=Banana Service Response"]
+        ports:
+        - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: banana-service
+spec:
+  type: ClusterIP
+  selector:
+    app: banana
+  ports:
+  - port: 5678
+    targetPort: 5678
+EOF
+
+kubectl apply -f apps.yaml
+
+Verify both pods are running:
+
+kubectl get pods -l 'app in (apple, banana)'
+
+Step 3: Create the Ingress Rule
+
+Create an Ingress manifest that inspects incoming requests and routes traffic based on URL prefix:
+
+cat <<EOF > ingress-rules.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: path-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /apple
+        pathType: Prefix
+        backend:
+          service:
+            name: apple-service
+            port:
+              number: 5678
+      - path: /banana
+        pathType: Prefix
+        backend:
+          service:
+            name: banana-service
+            port:
+              number: 5678
+EOF
+
+kubectl apply -f ingress-rules.yaml
+
+@nithyan1194 ➜ /workspaces/learning_journey (main) $ kubectl get ingress path-ingress
+NAME           CLASS   HOSTS   ADDRESS   PORTS   AGE
+path-ingress   nginx   *                 80      21s
+
+
+Step 4: Test Path-Based Routing Inside Codespaces
+
+Because Minikube runs inside a Docker container inside Codespaces, query the Ingress controller using Minikube's internal IP:
+
+# Get the Minikube internal IP
+MINIKUBE_IP=$(minikube ip)
+
+# Test Apple route
+curl http://$MINIKUBE_IP/apple
+
+# Test Banana route
+curl http://$MINIKUBE_IP/banana
+
+Run these steps and verify whether each curl command returns its respective service response (Apple Service Response and Banana Service Response).
+
+@nithyan1194 ➜ /workspaces/learning_journey (main) $ curl http://$MINIKUBE_IP/apple
+Apple Service Response
+@nithyan1194 ➜ /workspaces/learning_journey (main) $ curl http://$MINIKUBE_IP/banana
+Banana Service Response
+
