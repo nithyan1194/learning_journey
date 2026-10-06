@@ -1,0 +1,39 @@
+The Scale-Down Cooldown (Stabilization Window)
+
+When the load generator stops, CPU utilization drops back down to 0% within seconds, 
+but the extra Pods will remain running for 5 minutes by default.
+
+This delay is governed by the Stabilization Window (stabilizationWindowSeconds: 300):
+
+The Problem (Thrashing / Flapping): In production, network traffic is often bursty. 
+If Kubernetes scaled pods down immediately after a 10-second traffic dip, an incoming second wave of
+ traffic would overwhelm the single remaining pod before new pods could boot up again.
+
+The Solution: The HPA controller looks at the highest load calculated over the past 5-minute rolling
+ window before removing any Pods. Once the metrics remain consistently below target for the entire 
+ duration, it begins scaling down.
+
+Under-the-Hood Sequence During Scale-Down
+
+[ Load Stops ]
+      |
+      v
+1. Metrics Server reports 0% CPU utilization
+      |
+      v
+2. HPA Controller recalculates target replicas:
+   ceil[ currentReplicas * (0 / 50) ] = 0 -> clamped to --min=1
+      |
+      v
+3. Stabilization Timer starts (300 seconds / 5 min cooldown)
+      |
+      v
+4. Cooldown expires -> HPA updates Deployment spec: replicas = 1
+      |
+      v
+5. ReplicaSet terminates excess Pods (sends SIGTERM -> graceful shutdown)
+
+
+
+
+

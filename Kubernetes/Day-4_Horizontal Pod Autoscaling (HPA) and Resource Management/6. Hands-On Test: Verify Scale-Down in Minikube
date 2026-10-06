@@ -1,0 +1,39 @@
+1. Stop the Traffic Generator
+
+In the terminal where load-generator is running, press Ctrl + C.
+
+If it was running in the background, delete the pod:
+
+kubectl delete pod load-generator --now
+
+2. Watch the Utilization Drop First
+
+In your monitoring terminal, watch the HPA:
+
+kubectl get hpa php-apache -w
+
+Within 30–60 seconds, TARGETS will drop from >100%/50% down to 0%/50%. 
+However, REPLICAS will stay elevated at 4 or 5.
+
+3. Observe the Scale-Down After 5 Minutes
+
+Continue watching the terminal. Exactly 5 minutes after the load drops, you will see:
+
+REPLICAS decrease step-by-step back to 1.
+
+Running kubectl get pods -l run=php-apache will show the surplus pods entering 
+the Terminating state and disappearing.
+
+Production Tuning: Adjusting the Cooldown
+If 5 minutes is too long for local testing or dev environments, you can adjust the behavior 
+directly inside the HPA spec using the behavior field:
+
+spec:
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 30  # Scale down after just 30 seconds of quiet traffic
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+

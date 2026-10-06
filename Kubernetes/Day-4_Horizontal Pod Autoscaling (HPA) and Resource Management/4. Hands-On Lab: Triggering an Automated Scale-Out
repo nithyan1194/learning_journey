@@ -1,0 +1,93 @@
+Step 1: Enable the Metrics Server in Minikube
+
+Because Minikube is minimal by default, enable the metrics addon:
+
+minikube addons enable metrics-server
+
+Verify that the metrics server is running:
+
+kubectl get pods -n kube-system -l k8s-app=metrics-server
+
+Wait until it shows 1/1 Running (it may take 20–30 seconds), then verify node metrics can be fetched:
+
+kubectl top nodes
+
+Step 2: Deploy an App with CPU Requests
+
+Deploy a PHP Apache web server configured with explicit CPU requests:
+
+cat <<EOF > php-apache.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: php-apache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: php-apache
+  template:
+    metadata:
+      labels:
+        run: php-apache
+    spec:
+      containers:
+      - name: php-apache
+        image: registry.k8s.io/hpa-example
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "200m"
+          limits:
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: php-apache
+spec:
+  ports:
+  - port: 80
+  selector:
+    run: php-apache
+EOF
+
+kubectl apply -f php-apache.yaml
+
+
+
+Step 3: Create the HorizontalPodAutoscaler (HPA)
+Define an autoscale policy: keep average CPU utilization at 50% of the requested value (100m),
+scaling between a minimum of 1 and maximum of 5 replicas:
+
+kubectl autoscale deployment php-apache --cpu-percent=50 --min=1 --max=5
+
+Inspect the HPA:
+kubectl get hpa php-apache
+
+(Under TARGETS, you will initially see <unknown>/50% for a few moments while the Metrics Server
+ gathers its first cycle of data, before switching to 0%/50%.)
+
+
+Step 4: Generate Load and Watch Auto-Scaling
+Open a separate terminal window in Codespaces (or run it as a background job) to hammer the 
+web service with an infinite HTTP request loop:
+
+kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while true; do wget -q -O- http://php-apache; done"
+
+In your original terminal, watch the HPA and Pod count scale out in real time:
+
+kubectl get hpa php-apache -w
+
+Within 1–2 minutes, you will watch:
+
+TARGETS spike from 0%/50% to well over 100%/50%.
+
+REPLICAS automatically climb from 1 to 2, 3, 4, or 5.
+
+If you run kubectl get pods -l run=php-apache, you will see new Pods running to share the incoming compute load.
+
+Execute Steps 1 through 3, and confirm once kubectl top nodes reports CPU/memory stats.
+
+

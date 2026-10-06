@@ -1,0 +1,345 @@
+1. Control Plane & Scheduling Mechanics
+Scenario: You run kubectl apply -f deployment.yaml to deploy 3 replicas of an application. The API server accepts the request, but when you check kubectl get pods, the pods remain stuck in a Pending state indefinitely.
+
+Walk through the control plane lifecycle: which component is failing or unable to act here?
+
+What underlying cluster or node constraints would cause this behavior?
+
+2. Service Discovery: Endpoints vs. EndpointSlices
+Question: In Kubernetes v1.33+, v1.Endpoints is formally deprecated in favor of discovery.k8s.io/v1 EndpointSlice.
+
+What architectural bottleneck in large-scale enterprise clusters forced the Kubernetes engineering team to replace Endpoints with EndpointSlices?
+
+How does kube-proxy interact with these slices to route incoming traffic?
+
+3. Application Reliability & The "Cascading Outage" Trap
+Scenario: A backend developer configures a livenessProbe that queries SELECT 1 FROM orders_db every 5 seconds to ensure the database is alive. During a peak flash sale, the database CPU spikes to 100%, causing queries to take 8 seconds to respond.
+
+What will happen to the application pods across the cluster?
+
+Why is this considered an anti-pattern, and how should readinessProbe and livenessProbe be decoupled to prevent a total outage?
+
+4. Storage Decoupling & Lifecycle
+Question: Explain the relationship between a StorageClass, a PersistentVolume (PV), and a PersistentVolumeClaim (PVC).
+
+If a pod mounting a PVC with accessModes: [ReadWriteOnce] is scheduled on Node A, can a replica of that same deployment be scheduled on Node B and mount that exact same PVC? Explain why or why not.
+
+5. Ingress Architecture & Edge Routing
+Scenario: You have a cluster running two microservices: a public storefront (shop.company.com) and an internal admin API (api.company.com).
+
+Contrast Path-Based Routing with Host-Based Routing in an Ingress manifest.
+
+What is the difference between an Ingress resource and an Ingress Controller? What happens if you apply an Ingress YAML manifest without an Ingress Controller running in the cluster?
+
+6. Autoscaling Dynamics & Stabilization
+Scenario: You configure a Horizontal Pod Autoscaler (HPA) targeting 50% CPU utilization. You hit the service with high traffic, scaling the deployment from 1 to 5 replicas. You abruptly terminate the traffic generator.
+
+CPU drops to 0% immediately, but kubectl get pods shows all 5 pods still running 2 minutes later. Is this a bug or intended behavior?
+
+What mechanism governs this delay, and what production problem does it solve?
+
+
+Question 1:
+
+Control Plane Lifecycle: Between kube-apiserver, etcd, kube-controller-manager, and kube-scheduler, which component is failing or unable to complete its job when Pods exist but stay stuck in Pending?
+
+Root Causes: What specific cluster constraints or node conditions (e.g., resources, taints, selectors) would cause that component to hold the Pods in Pending?
+
+1. The Crucial Distinction: requests vs. limits
+In your answer, you noted that the scheduler checks whether nodes have enough resource limits.
+
+In Kubernetes, the scheduler evaluates requests, never limits.
+
+A node might be at 20% actual CPU usage, but if existing pods on that node have already claimed 100% of the CPU via their requests, the scheduler marks that node as full and refuses to place another pod there.
+
+2. The Scheduler’s Two-Step Process
+When kube-scheduler pulls a pod from its queue, it executes two distinct phases:
+
+Filtering (Predicates): It filters out all nodes that cannot run the pod. If zero nodes pass the filter, the pod stays Pending with a FailedScheduling event.
+
+Scoring (Priorities): If multiple nodes pass, it scores them (e.g., spreading pods across failure domains or balancing resource utilization) and picks the highest-scoring node.
+
+3. Other Production Causes of Pending Pods
+Beyond insufficient CPU or memory requests, an interviewer will want to hear 3–4 other common culprits:
+
+Taints and Tolerations: The nodes have taints (such as control-plane taints NoSchedule), and the pod does not have the matching toleration.
+
+nodeSelector / Node Affinity: The pod manifest requires disktype: ssd or zone: us-east-1a, but no active nodes have that label.
+
+Unbound PVCs: The pod requests a PersistentVolumeClaim, but the PV is still pending or bound to a storage pool in an unreachable availability zone.
+
+HostPort Conflict: The pod requests a specific hostPort on the physical node that is already occupied by another process.
+
+The Real-World Troubleshooting Command
+To prove this during an incident, you check the pod events:
+
+1. The Crucial Distinction: requests vs. limits
+In your answer, you noted that the scheduler checks whether nodes have enough resource limits.
+
+In Kubernetes, the scheduler evaluates requests, never limits.
+
+A node might be at 20% actual CPU usage, but if existing pods on that node have already claimed 100% of the CPU via their requests, the scheduler marks that node as full and refuses to place another pod there.
+
+2. The Scheduler’s Two-Step Process
+When kube-scheduler pulls a pod from its queue, it executes two distinct phases:
+
+Filtering (Predicates): It filters out all nodes that cannot run the pod. If zero nodes pass the filter, the pod stays Pending with a FailedScheduling event.
+
+Scoring (Priorities): If multiple nodes pass, it scores them (e.g., spreading pods across failure domains or balancing resource utilization) and picks the highest-scoring node.
+
+3. Other Production Causes of Pending Pods
+Beyond insufficient CPU or memory requests, an interviewer will want to hear 3–4 other common culprits:
+
+Taints and Tolerations: The nodes have taints (such as control-plane taints NoSchedule), and the pod does not have the matching toleration.
+
+nodeSelector / Node Affinity: The pod manifest requires disktype: ssd or zone: us-east-1a, but no active nodes have that label.
+
+Unbound PVCs: The pod requests a PersistentVolumeClaim, but the PV is still pending or bound to a storage pool in an unreachable availability zone.
+
+HostPort Conflict: The pod requests a specific hostPort on the physical node that is already occupied by another process.
+
+The Real-World Troubleshooting Command
+To prove this during an incident, you check the pod events:
+
+kubectl describe pod <pending-pod-name>
+
+The bottom Events section will clearly say:
+Warning  FailedScheduling  default-scheduler  0/3 nodes are available: 3 Insufficient cpu.
+
+
+Question 2:
+
+Service Discovery: Endpoints vs. EndpointSlice
+In modern Kubernetes, v1.Endpoints is formally deprecated in favor of discovery.k8s.io/v1 EndpointSlice.
+
+The Scaling Bottleneck: What architectural limitation occurred in large-scale production clusters (e.g., deployments scaling to 2,000+ pods) when relying on the monolithic v1.Endpoints object? What happened across the network and control plane when a single pod restarted?
+
+Packet Routing Mechanics: How does kube-proxy on worker nodes interact with these endpoint objects to actually translate a virtual Service ClusterIP into backend Pod traffic?
+
+How would you explain the breakdown of the old object and how EndpointSlice fixes it to an interviewer?
+
+
+1. Breaking Down Your Answer (The Scaling Bottleneck)
+In the original v1.Endpoints design:
+
+All Pod IPs for a service were stored in a single monolithic list.
+
+If a service had 2,000 pods and a single pod restarted, that entire multi-megabyte object had to be serialized in etcd, pushed across the network by kube-apiserver, and parsed by kube-proxy on every single worker node in the cluster.
+
+EndpointSlice chunks these backends into smaller sets (by default, up to 100 endpoints per slice). When one pod restarts, only that specific slice updates and transmits across the wire, drastically reducing control-plane network bandwidth and memory overhead.
+
+2. Packet Routing Mechanics (kube-proxy & the Kernel)
+Here is how the packet routing mechanics complete the picture:
+
+[ Client Pod / Curl ] 
+         |
+         | Sends packet to virtual Service IP (e.g., 10.96.142.20:80)
+         v
++-------------------------------------------------------------+
+|                     Worker Node Kernel                      |
+|                                                             |
+|   1. kube-proxy watches EndpointSlices via kube-apiserver   |
+|   2. kube-proxy writes rules into Linux iptables or IPVS    |
+|   3. Kernel intercepts packet via PREROUTING / NAT table    |
+|   4. DNAT translates ClusterIP -> Chosen Pod IP             |
+|      (e.g., 10.96.142.20:80 -> 10.244.0.14:8080)            |
++------------------------------+------------------------------+
+                               |
+                               v Forwarded directly
+                     [ Backend Pod IP ]
+
+
+How it works step by step:
+Watching the State: kube-proxy runs on every node and watches the API server for changes to Services and their corresponding EndpointSlices.
+
+Programming the Kernel: kube-proxy does not sit in the middle of data packets directly. Instead, it programs the host node's Linux kernel network stack using either:
+
+iptables (default): Creates random probability NAT rules to spread traffic across the endpoints.
+
+IPVS (high scale): Creates an in-kernel hash table for faster lookup and connection routing with algorithms like round-robin or least-connection.
+
+Packet Translation (DNAT): When a container sends a request to the Service's virtual ClusterIP, the Linux kernel intercepts the packet before it leaves the node, performs Destination NAT (DNAT) to swap the virtual IP for one of the healthy Pod IPs listed in the EndpointSlice, and routes the packet straight to that Pod.
+
+
+Question 3:
+
+Application Reliability & The "Cascading Outage" Trap
+Scenario:
+
+A developer configures a livenessProbe on an application deployment. To verify the service is "healthy," the probe runs a quick query against the shared database (SELECT 1 FROM orders_db) every 5 seconds.
+
+During a major flash sale, database CPU hits 100%, and query responses slow down to 8 seconds.
+
+The Chain Reaction: What will the kubelet on each node do to the application pods when this query takes 8 seconds to respond? What happens to the cluster and database right after?
+
+Architectural Fix: Why is tying a livenessProbe to an external dependency considered a critical anti-pattern? How should readinessProbe and livenessProbe be decoupled to handle this scenario safely?
+
+How would you break down this disaster scenario and the proper fix?
+
+
+1. The Full Disaster Lifecycle: The Self-Inflicted DDoS
+When an app's livenessProbe touches the database directly during a traffic surge:
+
+[ Flash Sale Traffic Surge ]
+                               |
+                               v
+                     [ Database hits 100% CPU ]
+                               |
+       +-----------------------+-----------------------+
+       | Query latency spikes to 8s (Probe timeout is 1s)
+       v                                               v
+[ Pod 1 Liveness Fails ]                    [ Pod 2 Liveness Fails ]
+       |                                               |
+       v                                               v
+[ Kubelet SIGKILLs Pod 1 ]                  [ Kubelet SIGKILLs Pod 2 ]
+       |                                               |
+       +-----------------------+-----------------------+
+                               |
+                               v
+               [ ALL PODS RESTART SIMULTANEOUSLY ]
+                               |
+                               v
+         [ Startup Burst: Pods hammer DB with new connection ]
+         [ pool initializations (Thundering Herd Problem)    ]
+                               |
+                               v
+                 [ Database Completely Crashes ]
+
+Simultaneous Restarts: Every replica times out at roughly the same moment. The kubelet on each node intervenes and issues a hard restart (SIGKILL / SIGTERM) to the containers.
+
+The "Thundering Herd": When 20 or 50 pods reboot simultaneously, their startup code typically initializes connection pools (e.g., each pod immediately attempts 10–20 TCP connections to the DB).
+
+Total Outage: This creates a self-inflicted Denial of Service (DDoS) attack against an already struggling database, ensuring it never recovers.
+
+2. The Golden Rule of Probe Decoupling
+livenessProbe (Process & Memory Health Only):
+
+Keep it strictly internal to the container. It should only check if the local web server thread pool is responsive or if a local lock/deadlock has occurred (e.g., GET /healthz/live returning a simple in-memory 200 OK). Never call an external network dependency (DB, Redis, payment gateway) from a liveness probe.
+
+readinessProbe (Downstream & Traffic Readiness):
+
+Can verify whether the pod is capable of serving live user queries. If the database is overwhelmed or disconnected, the readiness probe fails:
+
+The Pod is not killed.
+
+The EndpointSlice controller detaches the Pod's IP from the Service.
+
+In-flight requests can finish without the container getting abruptly killed mid-transaction.
+
+
+Question 4: Storage Decoupling & Lifecycle
+Here is Question 4:
+
+In your own words, explain how a StorageClass, a PersistentVolume (PV), and a PersistentVolumeClaim (PVC) relate to each other. Who typically creates which?
+
+If a Deployment has 2 replicas scheduled on different nodes (Node A and Node B), and both pods reference the same PVC configured with accessModes: [ReadWriteOnce]:
+
+What will happen to the pod scheduled on Node B?
+
+Why does this happen, and what access mode or workload type would you use instead?
+
+Take a shot at breaking down the storage mechanics.
+
+
+1. What happens to the Pod on Node B?
+The Pod on Node B will be stuck in ContainerCreating with a specific volume error:
+
+kubectl describe pod <pod-on-node-b>
+
+
+Event: Warning FailedAttachVolume or Multi-Attach error for volume ... Volume is already exclusively attached to one node and can't be attached to another.
+
+Why: In cloud environments (like AWS EBS or Google Persistent Disk), physical block storage is attached to a virtual machine node at the hypervisor level. A block device cannot physically attach to two distinct EC2/Compute instances simultaneously under ReadWriteOnce.
+
+
+2. The RWX Nuance & The StatefulSet Alternative
+You correctly noted that changing to ReadWriteMany (RWX) allows multiple nodes to mount the volume. However, in an interview, keep these two critical production caveats in mind:
+
+Caveat A: Underlying Storage Support
+Standard cloud block storage (e.g., AWS EBS gp3, Azure Managed Disk) does not support RWX. To use RWX, you must use a network-based filesystem like:
+
+NFS
+
+AWS EFS
+
+Azure Files
+
+CephFS / GlusterFS
+
+Caveat B: Databases vs. StatefulSets
+If the workload is a database (e.g., PostgreSQL, MySQL, Redis), having two pods write to the same shared volume via RWX will corrupt the database files.
+
+Instead of RWX, the standard pattern for multi-replica stateful workloads is a StatefulSet using volumeClaimTemplates:
+
+Pod-0 gets pvc-0 → pv-0 (dedicated)
+
+Pod-1 gets pvc-1 → pv-1 (dedicated)
+
+Each replica gets its own isolated disk while running identically.
+
+Question 5: Ingress Architecture & Edge Routing
+Here is Question 5:
+
+Scenario: You run an e-commerce platform with a public storefront (shop.company.com) and a backend API (api.company.com).
+
+Contrast Path-Based Routing with Host-Based Routing in an Ingress manifest. How does the Ingress Controller tell them apart?
+
+What is the fundamental difference between an Ingress resource and an Ingress Controller? What happens if you apply an Ingress YAML manifest into a cluster where no Ingress Controller is installed?
+
+Take a shot at breaking down Question 5!
+
+
+Difference between the Ingress resource and the Ingress Controller :
+
+Ingress Resource: A declarative YAML file that defines rules.
+
+Ingress Controller: The running reverse proxy daemon (like NGINX, Traefik, or Envoy) watching kube-apiserver to execute those rules.
+
+Without a controller: The Ingress YAML is stored as metadata in etcd, but no process acts on it, meaning no traffic is routed.
+
+Clarifying Path-Based vs. Host-Based Routing
+In the first part of your response, you focused on the URL path. In production and interviews, clearly distinguish the two routing mechanisms:
+
+Incoming HTTP Request
+                                |
+        +-----------------------+-----------------------+
+        |                                               |
+        v                                               v
+[ Host-Based Routing ]                         [ Path-Based Routing ]
+Checks HTTP 'Host' Header:                     Checks Request URI Path:
+- api.company.com  -> api-service              - company.com/api   -> api-service
+- shop.company.com -> shop-service             - company.com/shop  -> shop-service
+
+Host-Based Routing (Subdomains):
+
+The Ingress Controller inspects the HTTP Host header in the incoming request.
+
+shop.company.com routes to the storefront service, while api.company.com routes to the API service.
+
+Both subdomains point to the same external IP, but the controller separates them based on the domain name.
+
+Path-Based Routing (URL Prefixes):
+
+The domain is identical (e.g., company.com), but the controller inspects the URI path.
+
+[company.com/shop](https://company.com/shop) routes to the shop service, while [company.com/api](https://company.com/api) routes to the API backend.
+
+Question 6: Autoscaling Dynamics & Stabilization
+Here is the final question of the set:
+
+Scenario:
+
+You configure a Horizontal Pod Autoscaler (HPA) targeting 50% CPU utilization. You generate heavy traffic, scaling the deployment from 1 to 5 replicas. You abruptly stop the traffic generator.
+
+The CPU metric drops to 0% immediately, but kubectl get pods shows all 5 pods still running 2 minutes later.
+
+Is this a bug or intended behavior?
+
+What mechanism causes this delay, what is the default duration, and what production problem does this safeguard against?
+
+How would you break this down?
+
+It is intended behavior designed specifically to prevent what the industry calls flapping or thrashing—a dangerous cycle where bursty traffic causes pods to rapidly scale down, only to be overwhelmed seconds later by another wave of traffic and forced to boot up all over again.
+
+The specific technical parameter is the Stabilization Window (behavior.scaleDown.stabilizationWindowSeconds), which defaults to 300 seconds (5 minutes). During this window, the HPA controller evaluates the peak algorithm recommendation across the rolling timeframe, ensuring traffic has genuinely died down before it signals the ReplicaSet controller to terminate excess pods.
+
