@@ -1,0 +1,59 @@
+Step 1: Enable the Metrics Server in Minikube
+
+Because Minikube is minimal by default, enable the metrics addon:
+
+minikube addons enable metrics-server
+
+Verify that the metrics server is running:
+
+kubectl get pods -n kube-system -l k8s-app=metrics-server
+
+Wait until it shows 1/1 Running (it may take 20–30 seconds), then verify node metrics can be fetched:
+
+kubectl top nodes
+
+Step 2: Deploy an App with CPU Requests
+
+Deploy a PHP Apache web server configured with explicit CPU requests:
+
+cat <<EOF > php-apache.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: php-apache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: php-apache
+  template:
+    metadata:
+      labels:
+        run: php-apache
+    spec:
+      containers:
+      - name: php-apache
+        image: registry.k8s.io/hpa-example
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "200m"
+          limits:
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: php-apache
+spec:
+  ports:
+  - port: 80
+  selector:
+    run: php-apache
+EOF
+
+kubectl apply -f php-apache.yaml
+
+
+

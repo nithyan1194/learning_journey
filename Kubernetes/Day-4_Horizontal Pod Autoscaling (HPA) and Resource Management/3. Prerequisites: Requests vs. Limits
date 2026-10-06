@@ -1,0 +1,7 @@
+HPA cannot calculate percentage utilization without baseline values defined in the Pod manifest:
+
+requests: The baseline resource quantity guaranteed to the container. The scheduler uses this to pick an eligible node. HPA measures percentage against requests!
+
+limits: The hard ceiling. If a container exceeds CPU limits, it gets throttled. If it exceeds memory limits, it is killed by the kernel OOM (Out Of Memory) Killer (OOMKilled).
+
+

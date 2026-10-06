@@ -1,0 +1,6 @@
+In production, applications experience fluctuating traffic spikes (e.g., flash sales, morning logins). 
+Running 50 replicas 24/7 wastes cloud spend, while running only 2 replicas causes crashes when traffic surges. 
+
+The Horizontal Pod Autoscaler (HPA) automatically adjusts the number of Pod replicas in a Deployment based on 
+observed CPU, memory, or custom metrics.
+
