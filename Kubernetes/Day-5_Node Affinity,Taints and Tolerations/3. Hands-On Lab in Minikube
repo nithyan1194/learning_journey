@@ -1,0 +1,5 @@
+Because Minikube typically runs as a single node in Codespaces, applying a NoSchedule taint allows you to see the scheduling mechanics and failure events directly.
+
+Step 1: Inspect Your Node
+Get the exact name of your Minikube node:
+

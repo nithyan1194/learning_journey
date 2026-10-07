@@ -1,0 +1,64 @@
+Node Affinity attracts Pods to specific Nodes, 
+while Taints and Tolerations repel Pods from Nodes unless explicitly allowed.
+
+NODE AFFINITY (Attraction)                      TAINTS & TOLERATIONS (Repulsion)
+  Pod has preferences/requirements.                 Node repels all pods by default.
+
+  [ Pod: "I want a GPU node" ]                      [ Pod without pass ]
+               |                                             |
+               v (Attracted)                                 x (Repelled by Taint)
+  +--------------------------+                      +--------------------------+
+  | Node: disk=ssd, gpu=true |                      | Node: dedicated=gpu      |
+  +--------------------------+                      | Taint: NoSchedule        |
+                                                    +--------------------------+
+                                                             ^
+                                                             | (Allowed through)
+                                                    [ Pod with Toleration:     ]
+                                                    [ "I tolerate dedicated=gpu"]
+
+
+Core Concepts Explained
+
+1. Node Affinity: Pod-Driven Placement
+
+Node Affinity lets you specify rules matching labels on nodes. It replaces the older, 
+simpler nodeSelector.
+
+requiredDuringSchedulingIgnoredDuringExecution (Hard Rule): The scheduler must find a node matching this rule.
+ If no matching node exists, the Pod remains Pending.
+
+preferredDuringSchedulingIgnoredDuringExecution (Soft Rule): The scheduler tries to satisfy the rule, but if
+ no matching node exists, it places the Pod on any available node.
+
+IgnoredDuringExecution: If node labels change after the Pod is already running, the Pod will continue
+ running without being evicted.
+
+
+ 2. Taints: Node-Driven Repulsion
+A taint is set on a Node using the syntax key=value:effect. It creates an exclusion zone:
+
+NoSchedule: New Pods lacking a matching toleration will never be scheduled on this node. 
+ Existing running Pods remain unaffected.
+
+PreferNoSchedule: A soft warning. The scheduler attempts to avoid placing untolerating Pods on this node,
+ but will use it if the cluster is out of capacity elsewhere.
+
+NoExecute: Eviction rule. New Pods without a matching toleration are blocked, and already-running Pods 
+on the node that lack the toleration are immediately terminated and evicted.
+
+3. Tolerations: The Pod's Entry Pass
+A toleration is declared under spec.tolerations in the Pod manifest. It allows (but does not force) 
+a Pod to schedule onto a tainted node.
+
+Production Pattern: Taints and Node Affinity are frequently paired together.
+
+The Taint prevents unwanted general workloads from landing on expensive or sensitive 
+nodes (e.g., GPU, payment PCI-DSS).
+
+The Node Affinity ensures the intended workload actively targets those dedicated nodes rather
+ than landing on standard general-purpose nodes.
+
+
+
+
+

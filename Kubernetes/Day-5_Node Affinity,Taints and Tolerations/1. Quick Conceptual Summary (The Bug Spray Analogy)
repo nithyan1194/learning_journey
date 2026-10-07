@@ -1,0 +1,19 @@
+While Affinity is used to attract pods to specific nodes, Taints and Tolerations are used to repel pods from nodes:
+
+Taint (applied to a Node): "Keep away unless you have a pass."
+
+Example: A node with an expensive GPU is tainted so standard web apps don't accidentally schedule on it and consume resources.
+
+Toleration (applied to a Pod): "I have a pass for that taint."
+
+The toleration does not force the pod onto that node; it simply allows the scheduler to place it there if needed.
+
+
+Common Taint Effects:
+
+NoSchedule: If a pod doesn't have a matching toleration, it cannot be scheduled on this node.
+
+PreferNoSchedule: The scheduler tries to avoid placing untolerating pods here, but will if no other nodes are available.
+
+NoExecute: If a running pod on the node lacks this toleration, it is immediately evicted/killed off the node.
+
