@@ -1,0 +1,18 @@
+Open web-app/templates/deployment.yaml in your editor or run:
+
+Open web-app/templates/deployment.yaml in your editor or run:
+
+You will see several distinct templating patterns:
+
+A. Dot Notation and Scoping (.Values)
+The leading dot (.) represents the root context scope.
+
+.Values accesses anything declared in values.yaml.
+
+.Release contains metadata about the release itself (e.g., {{ .Release.Name }} evaluates to dev-web, and {{ .Release.Namespace }} evaluates to default).
+
+.Chart accesses fields from Chart.yaml (e.g., {{ .Chart.Version }}).
+
+B. Template Functions & Pipelines (|)
+Helm inherits Go template functions and includes the Sprig template library. Notice how values are piped into functions:
+

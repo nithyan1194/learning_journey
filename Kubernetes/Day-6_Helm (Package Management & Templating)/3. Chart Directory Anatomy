@@ -1,0 +1,12 @@
+When you create a chart, Helm generates this standard structure:
+
+my-chart/
+├── Chart.yaml          # Metadata: chart name, version (SemVer), description
+├── values.yaml         # Default input values passed to the templates
+├── charts/             # Subcharts and dependencies (e.g., Redis, PostgreSQL)
+└── templates/          # Dynamic Kubernetes manifests
+    ├── deployment.yaml # Templated Deployment
+    ├── service.yaml    # Templated Service
+    ├── ingress.yaml    # Templated Ingress
+    ├── _helpers.tpl    # Reusable Go template functions and label definitions
+    └── NOTES.txt       # Instructions printed to the terminal after installation

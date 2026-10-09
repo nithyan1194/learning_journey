@@ -1,0 +1,34 @@
+values.yaml                          templates/deployment.yaml
+   (Configuration Data)                       (Manifest Blueprint)
++-----------------------+              +-----------------------------------+
+| replicaCount: 3       |      +       | spec:                             |
+| image: nginx:alpine   |              |   replicas: {{ .Values.replicaCount }}
++-----------------------+              |   image: {{ .Values.image }}      |
+            \                          +-----------------------------------+
+             \                                      /
+              \                                    /
+               v                                  v
+        +-----------------------------------------------+
+        |                 Helm Engine                   |
+        |         (Renders Go Template Engine)          |
+        +-----------------------+-----------------------+
+                                |
+                                | Emits pure Kubernetes YAML
+                                v
+        +-----------------------------------------------+
+        |                 kube-apiserver                |
+        |       (Stores atomic Release in Secrets)      |
+        +-----------------------------------------------+
+
+
+Chart: A directory containing a packaged collection of Kubernetes resource blueprints, 
+ configuration files, and metadata.
+
+Values (values.yaml): The central variables file. This separates environment-specific 
+ configuration from the application architecture.
+
+Templates (templates/): Manifest blueprints written with the Go template 
+ engine ({{ .Values.<key> }}) that generate standard Kubernetes YAML at deployment time.
+
+Release: A specific running instance of a chart in your cluster. You can deploy the exact 
+ same chart multiple times with different values (e.g., release web-dev and release web-prod).

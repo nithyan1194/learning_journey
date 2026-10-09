@@ -1,0 +1,15 @@
+web-app/values.yaml                      web-app/templates/deployment.yaml
++----------------------------+         +---------------------------------------------+
+| replicaCount: 1            |  ===>   | spec:                                       |
+| image:                     |         |   replicas: {{ .Values.replicaCount }}      |
+|   repository: nginx        |  ===>   |   containers:                               |
+|   tag: "1.16.0"            |  ===>   |     - image: "{{ .Values.image.repository }}:|
+|   pullPolicy: IfNotPresent |         |               {{ .Values.image.tag }}"      |
++----------------------------+         +---------------------------------------------+
+                                                              |
+                                                    [ Helm Render Engine ]
+                                                              v
+                                                Clean Kubernetes YAML
+                                           (Sent directly to kube-apiserver)[cite: 1]
+
+                                           
