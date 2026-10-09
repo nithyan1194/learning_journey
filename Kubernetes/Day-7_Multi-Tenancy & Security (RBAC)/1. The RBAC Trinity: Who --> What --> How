@@ -1,0 +1,53 @@
+With package management and versioned releases established, the next critical enterprise pillar 
+is Role-Based Access Control (RBAC).
+
+In production, engineering teams, automated CI/CD runners (like GitHub Actions, GitLab CI, or Jenkins),
+ and pods must never operate with cluster-admin privileges. Kubernetes uses RBAC to enforce the Principle of Least Privilege.
+
+
+1. The RBAC Trinity: Who --> What --> How
+
+Every RBAC policy in Kubernetes answers one simple question: 
+Can [SUBJECT] perform [VERB] on [RESOURCE] in [NAMESPACE]?
+
++------------------+         +----------------------+         +-----------------------+
+|     SUBJECT      |         |     BINDING          |         |         ROLE          |
+|  (Who is asking) |         | (The glue attaching  |         | (What actions/verbs   |
+|                  |  ===>   |   Subject to Role)   |  ===>   |  are permitted)       |
+| - ServiceAccount |         |                      |         |                       |
+| - User / Group   |         | - RoleBinding        |         | - Role (Namespace)    |
++------------------+         | - ClusterRoleBinding |         | - ClusterRole (Global)|
+                             +----------------------+         +-----------------------+
+
+A. Subjects: Who is making the API request?
+
+Humans (Users & Groups): Kubernetes does not manage human user accounts in etcd.
+ Authentication is delegated to external identity providers (OIDC, AWS IAM, Azure AD, Okta, or X.509 
+ client certificates).
+
+Workloads & Automations (ServiceAccount): Managed directly inside Kubernetes. ServiceAccounts 
+ are assigned to Pods or CI/CD pipelines so processes can authenticate against kube-apiserver.
+
+B. Roles: What can be done?
+
+A Role defines a whitelist of allowed permissions:
+
+Role: Confined to a single Namespace (e.g., can only view pods in staging).
+
+ClusterRole: Cluster-wide (e.g., can view Nodes, PersistentVolumes, or pods across all namespaces).
+
+Permissions are defined by three fields:
+
+apiGroups: Which API group owns the resource (e.g., "" for core resources like Pods/Services, "apps" 
+ for Deployments/StatefulSets).
+
+resources: The targets (["pods", "deployments", "configmaps"]).
+
+verbs: Allowed actions (["get", "list", "watch", "create", "update", "patch", "delete"]).
+
+C. Bindings: Connecting the two
+
+RoleBinding: Grants permissions within a specific namespace.
+
+ClusterRoleBinding: Grants permissions cluster-wide.
+

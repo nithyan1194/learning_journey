@@ -1,0 +1,71 @@
+Let’s simulate an enterprise scenario: You need to set up a CI/CD pipeline account (github-runner-sa)
+ that is strictly allowed to view and restart deployments in the default namespace, but must be forbidden
+ from reading cluster secrets or modifying nodes.
+
+ 1. Create the ServiceAccount
+
+Create Identity
+
+Generate the workload identity in the default namespace:
+
+kubectl create serviceaccount github-runner-sa
+
+Verification: Run kubectl get serviceaccount github-runner-sa.
+
+2. Define the Restricted Role
+
+Define Permissions
+
+Create a Role named deployment-manager that only allows managing Deployments and viewing Pods:
+
+cat <<EOF > deployment-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: deployment-manager
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+EOF
+
+kubectl apply -f deployment-role.yaml
+
+Verification: Run kubectl describe role deployment-manager.
+
+3. Bind the Role to the ServiceAccount:
+
+Attach Permissions.
+
+Glue the ServiceAccount and the Role together using a RoleBinding:
+
+kubectl create rolebinding github-runner-binding \
+  --role=deployment-manager \
+  --serviceaccount=default:github-runner-sa
+
+Verification: Run kubectl describe rolebinding github-runner-binding.
+
+4.Test Permissions with kubectl auth can-i:
+
+Production Audit Tool
+
+Kubernetes has a built-in testing flag (--as) that lets cluster admins impersonate any identity to verify
+ RBAC policies without logging in as them:
+
+# 1. Can the SA list pods? (Should say 'yes')
+kubectl auth can-i list pods --as=system:serviceaccount:default:github-runner-sa
+
+# 2. Can the SA patch deployments? (Should say 'yes')
+kubectl auth can-i patch deployments --as=system:serviceaccount:default:github-runner-sa
+
+# 3. Can the SA read Secrets? (Should say 'no')
+kubectl auth can-i get secrets --as=system:serviceaccount:default:github-runner-sa
+
+# 4. Can the SA delete pods? (Should say 'no')
+kubectl auth can-i delete pods --as=system:serviceaccount:default:github-runner-sa
+
+
