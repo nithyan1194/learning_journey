@@ -1,0 +1,16 @@
+Why Helm? The Problem with Raw YAML
+Over Days 1 through 3, you deployed raw YAML files (deployment.yaml, service.yaml, ingress.yaml). In enterprise environments, this creates major challenges:
+
+YAML Sprawl & Duplication: Deploying across dev, staging, and prod usually means copying and
+ pasting entire directories of manifests, changing only an image tag, replica count, or environment variable.
+
+No Versioning or Rollbacks: kubectl apply doesn't track revisions of multi-resource applications
+ as a single unit. Rolling back a broken multi-service deployment requires manual tracking.
+
+No Package Management: Installing third-party tools (like Prometheus, Redis, or Cert-Manager) would
+ require managing dozens of raw upstream manifests yourself.
+
+Helm is the package manager for Kubernetes (think apt, yum, or npm, but for cluster workloads). 
+It bundles your YAML manifests into dynamic, parameterized packages called Charts.
+
+

@@ -1,0 +1,67 @@
+Verify Helm is installed in your Codespaces terminal (Minikube / Codespaces typically includes it, 
+or we install it via script):
+
+helm version --short
+
+If it returns a version (e.g., v3.x.x), you are ready. If not, install it with one command:
+
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+Step 1: Create a Boilerplate Chart
+Run:
+
+helm create web-suite
+
+Inspect the generated folder:
+
+ls -la web-suite
+ls -la web-suite/templates
+
+Step 2: Dry-Run and Template Rendering
+Before deploying anything to your cluster, render the templates locally to see the raw YAML that Helm would produce:
+
+helm template my-release ./web-suite
+
+ path: /
+              port: http
+---
+# Source: web-suite/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "my-release-web-suite-test-connection"
+  labels:
+    helm.sh/chart: web-suite-0.1.0
+    app.kubernetes.io/name: web-suite
+    app.kubernetes.io/instance: my-release
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['my-release-web-suite:80']
+  restartPolicy: Never
+
+Notice how Helm took default variables from values.yaml and injected them into the manifests inside templates/.
+
+
+Step 3: Install the Chart onto Your Cluster
+Deploy the chart as a release named dev-webb:
+
+helm install dev-webb ./web-suite
+
+Verify your deployment and release:
+
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART           APP VERSION
+dev-webb        default         1               2026-10-09 07:26:13.060231858 +0000 UTC deployed        web-suite-0.1.0 1.16.0     
+NAME                                      READY   STATUS    RESTARTS   AGE
+pod/dev-webb-web-suite-6697b5bbbb-nnzcm   1/1     Running   0          42s
+
+NAME                         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+service/dev-webb-web-suite   ClusterIP   10.104.248.182   <none>        80/TCP    42s
+
+
