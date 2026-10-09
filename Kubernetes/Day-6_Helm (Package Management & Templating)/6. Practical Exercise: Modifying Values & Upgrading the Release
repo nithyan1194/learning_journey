@@ -1,0 +1,71 @@
+Let's test modifying configuration without touching the underlying template YAML.
+
+1.Upgrade via Command-Line Flag (--set):
+
+Method 1
+Scale your deployment to 3 replicas on the fly without editing files:
+
+helm upgrade dev-web ./web-app --set replicaCount=3
+
+Verification: Run kubectl get pods -l app.kubernetes.io/instance=dev-web and see the Deployment scale to 3 running pods!
+
+2.Create an Environment-Specific Values File
+
+Method 2
+
+In real production CI/CD pipelines, you rarely use --set. Instead, you maintain dedicated files like values-staging.yaml and values-prod.yaml.
+
+Create a custom values file:
+
+cat <<EOF > values-prod.yaml
+replicaCount: 2
+service:
+  type: NodePort
+  port: 8080
+EOF
+
+Apply it over your release:
+
+helm upgrade dev-web ./web-app -f values-prod.yaml
+
+Verification: Run kubectl get svc -l app.kubernetes.io/instance=dev-web to confirm the Service 
+changed its type to NodePort and port to 8080.
+
+3.Inspect Revision History and Rollback:
+
+Release tracking
+
+Helm records every upgrade as an atomic revision in the cluster
+
+helm history dev-web
+
+Now roll back to Revision 1:
+
+helm rollback dev-web 1
+
+Verification: Run helm history dev-web and kubectl get pods -l app.kubernetes.io/instance=dev-web. 
+The replica count immediately drops back to 1!
+
+Try running the --set replicaCount=3 upgrade and helm history dev-web. What does your revision
+ history look like?
+
+
+REVISION        UPDATED                         STATUS          CHART           APP VERSION     DESCRIPTION     
+1               Fri Oct  9 05:44:42 2026        superseded      web-app-0.1.0   1.16.0          Install complete
+2               Fri Oct  9 06:47:15 2026        superseded      web-app-0.1.0   1.16.0          Upgrade complete
+3               Fri Oct  9 06:48:45 2026        superseded      web-app-0.1.0   1.16.0          Upgrade complete
+4               Fri Oct  9 06:51:56 2026        superseded      web-app-0.1.0   1.16.0          Rollback to 1   
+5               Fri Oct  9 06:55:24 2026        deployed        web-app-0.1.0   1.16.0          Upgrade complete
+
+That helm history output illustrates Helm's release tracking model.
+
+Notice key operational details from your table:
+
+Append-Only History: Helm never edits history in-place. When you ran helm rollback dev-web 1 at Revision 4, Helm did not delete revisions 2 and 3; it synthesized Revision 1's exact manifest state and deployed it as a new forward-moving event (Rollback to 1).
+
+Atomic State: Only Revision 5 has the status deployed. Revisions 1 through 4 are marked superseded.
+
+Where this is stored: Helm 3 has no server component (no Tiller). Every single revision is stored directly inside your cluster a
+
+kubectl get secrets -l owner=helm,name=dev-web
+

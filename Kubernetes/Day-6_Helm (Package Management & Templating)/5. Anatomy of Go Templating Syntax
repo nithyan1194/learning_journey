@@ -9,10 +9,32 @@ The leading dot (.) represents the root context scope.
 
 .Values accesses anything declared in values.yaml.
 
-.Release contains metadata about the release itself (e.g., {{ .Release.Name }} evaluates to dev-web, and {{ .Release.Namespace }} evaluates to default).
+.Release contains metadata about the release itself (e.g., {{ .Release.Name }} evaluates to dev-web, 
+and {{ .Release.Namespace }} evaluates to default).
 
 .Chart accesses fields from Chart.yaml (e.g., {{ .Chart.Version }}).
 
 B. Template Functions & Pipelines (|)
-Helm inherits Go template functions and includes the Sprig template library. Notice how values are piped into functions:
+Helm inherits Go template functions and includes the Sprig template library. Notice how values are 
+piped into functions:
+
+imagePullPolicy: {{ .Values.image.pullPolicy }}
+image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+
+Pipelines (|): Take the output of the left side and pass it as an argument to the right side (identical to Linux pipes).
+
+default: If .Values.image.tag is empty or omitted, it falls back to .Chart.AppVersion.
+
+quote: Wraps the resulting string in double quotes ({{ .Values.myString | quote }}).
+
+C. Indentation Control (indent and nindent)
+YAML is strictly whitespace-sensitive. Helm solves indentation issues using nindent:
+
+labels:
+  {{- include "web-app.labels" . | nindent 4 }}
+
+  nindent 4 inserts a newline first, then indents the included snippet by 4 spaces.
+
+The hyphen {{- strips leading whitespace from the template tag itself, preventing accidental blank lines.
+
 
