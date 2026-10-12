@@ -1,0 +1,66 @@
+Deploy a test pod configured with your github-runner-sa identity and run an API query 
+directly from inside the container:
+
+1. Launch an Interactive Test Pod:Attach Identity to Pod
+
+Deploy a temporary debugging container running under github-runner-sa:
+
+    cat <<EOF | kubectl apply -f -
+    apiVersion: v1
+    kind: Pod
+    metadata:
+    name: rbac-test-pod
+    namespace: default
+    spec:
+    serviceAccountName: github-runner-sa
+    containers:
+    - name: curl-box
+        image: curlimages/curl:8.6.0
+        command: ["sleep", "3600"]
+    EOF
+
+Verification: Run kubectl get pod rbac-test-pod to confirm it reaches the Running state.
+
+2. Inspect the In-Pod Token Mount : Inspect Credentials
+
+Check the files injected by Kubernetes into the container:
+
+kubectl exec rbac-test-pod -- ls -la /var/run/secrets/kubernetes.io/serviceaccount/
+
+Verification: You will see three files: ca.crt, namespace, and token.
+
+3. Execute Authenticated API Calls from Inside the Pod:
+Live API Query
+
+Query the Kubernetes control plane directly from inside the pod using curl and the mounted token:
+
+# Test allowed query: List deployments (allowed by our Role)
+kubectl exec rbac-test-pod -- sh -c '
+  TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+  curl -s -k -H "Authorization: Bearer $TOKEN" \
+    https://kubernetes.default.svc/apis/apps/v1/namespaces/default/deployments | head -n 15
+'
+
+
+# Test forbidden query: Get secrets (denied by RBAC)
+kubectl exec rbac-test-pod -- sh -c '
+  TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+  curl -s -k -H "Authorization: Bearer $TOKEN" \
+    https://kubernetes.default.svc/api/v1/namespaces/default/secrets
+'
+
+Verification: The first command returns valid deployment JSON (HTTP 200). 
+The second returns an HTTP 403 Forbidden error with a message indicating the ServiceAccount cannot get secrets!
+
+4. Clean Up the Test Workload:Tidy Up.
+Remove the test pod:
+
+kubectl delete pod rbac-test-pod
+
+Verification: Run kubectl get pod rbac-test-pod to confirm it is terminated.
+
+Run these commands in your terminal. 
+Do you see the HTTP 200 JSON for deployments and the HTTP 403 Forbidden for secrets?
+
+
+

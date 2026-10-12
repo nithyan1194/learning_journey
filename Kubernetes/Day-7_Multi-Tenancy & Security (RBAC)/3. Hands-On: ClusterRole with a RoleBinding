@@ -1,0 +1,38 @@
+Create a reusable ClusterRole and bind it to a single namespace.
+
+1. Define a Cluster-Wide Role Template
+
+cat <<EOF > cluster-role-view.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: namespace-auditor
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+EOF
+
+kubectl apply -f cluster-role-view.yaml
+
+
+2. Bind It Locally via RoleBinding
+Even though namespace-auditor is a ClusterRole, attaching it with a RoleBinding restricts 
+its permissions strictly to the default namespace:
+
+kubectl create rolebinding runner-auditor-binding \
+  --clusterrole=namespace-auditor \
+  --serviceaccount=default:github-runner-sa \
+  --namespace=default
+
+
+  3. Verify the Namespace Boundary
+
+# Permitted in default namespace:
+kubectl auth can-i list configmaps --namespace=default --as=system:serviceaccount:default:github-runner-sa
+
+# Forbidden in kube-system namespace:
+kubectl auth can-i list configmaps --namespace=kube-system --as=system:serviceaccount:default:github-runner-sa
+
+The first query will return yes, and the second will return no.
+

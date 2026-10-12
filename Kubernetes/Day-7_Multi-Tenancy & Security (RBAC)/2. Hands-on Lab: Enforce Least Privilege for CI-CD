@@ -68,4 +68,4 @@ kubectl auth can-i get secrets --as=system:serviceaccount:default:github-runner-
 # 4. Can the SA delete pods? (Should say 'no')
 kubectl auth can-i delete pods --as=system:serviceaccount:default:github-runner-sa
 
-
+The first,second query will return yes, and the thrid fourth will return no.

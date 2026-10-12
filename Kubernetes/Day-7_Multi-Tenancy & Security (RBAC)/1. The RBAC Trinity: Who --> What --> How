@@ -1,8 +1,12 @@
-With package management and versioned releases established, the next critical enterprise pillar 
-is Role-Based Access Control (RBAC).
+Now that you can package and deploy workloads declaratively, the next production requirement
+ is securing the cluster. In production environments, human developers, CI/CD runners 
+ (GitHub Actions, GitLab CI), and automated pods must never operate with cluster-admin privileges.
+
+Kubernetes enforces this with Role-Based Access Control (RBAC) using the Principle of Least Privilege.
 
 In production, engineering teams, automated CI/CD runners (like GitHub Actions, GitLab CI, or Jenkins),
- and pods must never operate with cluster-admin privileges. Kubernetes uses RBAC to enforce the Principle of Least Privilege.
+ and pods must never operate with cluster-admin privileges. Kubernetes uses RBAC to enforce the 
+ Principle of Least Privilege.
 
 
 1. The RBAC Trinity: Who --> What --> How
